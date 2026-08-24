@@ -8,14 +8,20 @@
  *   각 에이전트의 **시스템 프롬프트 최상단**에 정적으로 보간(Interpolation)한다.
  *
  * 왜:
- *   Claude Code에서 `.claude/agents/<name>.md`의 본문은 그대로 해당 서브 에이전트의
- *   시스템 프롬프트가 된다. 시스템 프롬프트는 대화의 불변 접두사이므로,
- *   같은 에이전트 타입을 여러 번 스폰해도 이 영역은 캐시 히트된다.
- *   반면 `Read` 도구 호출은 (1) 에이전트마다 왕복 1회를 추가로 소모하고,
- *   (2) 설계 전문이 접두사가 아니라 대화 중간에 들어가며,
- *   (3) 에이전트가 일부만 읽거나 건너뛰는 비결정적 동작을 허용한다.
+ *   Claude Code·Codex 모두에서 `<surface>/agents/<name>.md`(`.claude/` 또는 `.codex/`)의
+ *   본문은 그대로 해당 서브 에이전트의 시스템 프롬프트가 된다. 시스템 프롬프트는
+ *   대화의 불변 접두사이므로, 같은 에이전트 타입을 여러 번 스폰해도 이 영역은
+ *   캐시 히트된다. 반면 `Read` 도구 호출은 (1) 에이전트마다 왕복 1회를 추가로
+ *   소모하고, (2) 설계 전문이 접두사가 아니라 대화 중간에 들어가며, (3) 에이전트가
+ *   일부만 읽거나 건너뛰는 비결정적 동작을 허용한다.
  *
- * 사용법:
+ * 이 스크립트는 표면(`.claude`/`.codex`) 어느 쪽에 설치되어도 동일하게 동작한다.
+ * 자기 위치(`import.meta.url`)로 어느 표면인지 판별해 그 표면의 `agents/`에만
+ * 주입하지만, `design.md`는 표면과 무관하게 항상 `<repoRoot>/.claude/_workspace/`에서
+ * 읽는다 — 두 표면이 같은 프로젝트에서 서로 다른 설계 명세를 SSOT로 삼으면 안 되기
+ * 때문이다 (`bin/cli.mjs` 상단 설명 참고).
+ *
+ * 사용법 (설치된 표면의 경로를 그대로 쓴다. 아래는 `.claude` 기준 예시):
  *   node .claude/tools/inject-design.mjs            # 주입 (기본)
  *   node .claude/tools/inject-design.mjs --check    # 주입 상태 검증만 (드리프트 시 exit 1)
  *   node .claude/tools/inject-design.mjs --clear     # 주입 블록 제거 (하네스 원본 복원)
@@ -33,10 +39,11 @@ import { fileURLToPath } from 'node:url';
 // 경로 상수
 // ─────────────────────────────────────────────────────────────
 const HERE = dirname(fileURLToPath(import.meta.url));
-const CLAUDE_DIR = resolve(HERE, '..');           // .claude
-const REPO_ROOT = resolve(CLAUDE_DIR, '..');
-const DESIGN_PATH = join(CLAUDE_DIR, '_workspace', '01_architecture', 'design.md');
-const AGENTS_DIR = join(CLAUDE_DIR, 'agents');
+const SURFACE_DIR = resolve(HERE, '..');          // 이 스크립트가 설치된 표면 자신: .claude 또는 .codex
+const REPO_ROOT = resolve(SURFACE_DIR, '..');
+// design.md·워크스페이스는 표면과 무관하게 항상 `.claude/_workspace/`에 고정한다.
+const DESIGN_PATH = join(REPO_ROOT, '.claude', '_workspace', '01_architecture', 'design.md');
+const AGENTS_DIR = join(SURFACE_DIR, 'agents');
 
 const BEGIN = '<!-- DESIGN_SPEC:BEGIN -->';
 const END = '<!-- DESIGN_SPEC:END -->';

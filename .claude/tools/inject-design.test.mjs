@@ -299,3 +299,59 @@ test('대상 에이전트 정의가 없으면 missing으로 보고하고 exit 1�
   assert.equal(r.stderr.includes('Error'), false, `예외 스택이 없어야 한다: ${r.stderr}`);
   assert.ok(fx.read('code-reviewer').includes(BEGIN), '나머지 대상은 정상 주입되어야 한다');
 });
+
+// ── 두 표면(.claude/.codex) 공존 (Codex 지원) ────────────────────
+
+/**
+ * `.claude`와 `.codex` 두 표면이 같은 프로젝트에 함께 설치된 픽스처.
+ * 스크립트는 각자 자기 표면(`resolve(HERE,'..')`)의 `agents/`에만 쓰지만,
+ * `design.md`는 항상 `.claude/_workspace/`라는 공유 앵커에서 읽어야 한다
+ * (bin/cli.mjs·inject-design.mjs 상단 설명 참고). 이 픽스처는 그 불변식을 고정한다.
+ */
+function twoSurfaceFixture(t, { design = GOOD_DESIGN } = {}) {
+  const root = mkdtempSync(join(tmpdir(), 'inject-design-test-codex-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+
+  const surfaceDirs = { claude: join(root, '.claude'), codex: join(root, '.codex') };
+  for (const dir of Object.values(surfaceDirs)) {
+    mkdirSync(join(dir, 'tools'), { recursive: true });
+    mkdirSync(join(dir, 'agents'), { recursive: true });
+    copyFileSync(SCRIPT, join(dir, 'tools', 'inject-design.mjs'));
+    for (const name of TARGETS) writeFileSync(join(dir, 'agents', `${name}.md`), agentSource(name));
+  }
+
+  const designPath = join(surfaceDirs.claude, '_workspace', '01_architecture', 'design.md');
+  mkdirSync(dirname(designPath), { recursive: true });
+  writeFileSync(designPath, design);
+
+  return {
+    scriptOf: (surface) => join(surfaceDirs[surface], 'tools', 'inject-design.mjs'),
+    read: (surface, name) => readFileSync(join(surfaceDirs[surface], 'agents', `${name}.md`), 'utf8'),
+    setDesign: (text) => writeFileSync(designPath, text),
+  };
+}
+
+test('.codex 표면은 자기 agents/에 주입하되 design.md는 .claude/_workspace의 공유 원본을 읽는다', (t) => {
+  const fx = twoSurfaceFixture(t);
+
+  const codexResult = spawnSync(process.execPath, [fx.scriptOf('codex'), '--json'], { encoding: 'utf8' });
+  assert.equal(codexResult.status, 0);
+  const codexData = JSON.parse(codexResult.stdout);
+  assert.equal(codexData.designReady, true, '.codex도 .claude/_workspace의 design.md를 찾아야 한다');
+  assert.ok(fx.read('codex', 'code-reviewer').includes(BEGIN), '.codex/agents에 주입되어야 한다');
+
+  const claudeResult = spawnSync(process.execPath, [fx.scriptOf('claude'), '--json'], { encoding: 'utf8' });
+  const claudeData = JSON.parse(claudeResult.stdout);
+  assert.equal(claudeData.fingerprint, codexData.fingerprint, '두 표면은 같은 design.md를 공유하므로 지문이 같아야 한다');
+});
+
+test('공유 design.md가 바뀌면 두 표면 모두 --check에서 드리프트를 감지한다', (t) => {
+  const fx = twoSurfaceFixture(t);
+  assert.equal(spawnSync(process.execPath, [fx.scriptOf('claude')]).status, 0);
+  assert.equal(spawnSync(process.execPath, [fx.scriptOf('codex')]).status, 0);
+
+  fx.setDesign(GOOD_DESIGN.replace('픽스처 전용 가상 스택', '공유 원본 변경'));
+
+  assert.equal(spawnSync(process.execPath, [fx.scriptOf('claude'), '--check']).status, 1);
+  assert.equal(spawnSync(process.execPath, [fx.scriptOf('codex'), '--check']).status, 1);
+});
