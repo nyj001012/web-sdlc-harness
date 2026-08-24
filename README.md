@@ -1,8 +1,10 @@
 # web-sdlc-harness
 
-클로드 코드를 이용할 때 사용할 하네스 (풀스택 웹 개발)
+Claude Code와 Codex CLI 양쪽에서 쓸 수 있는 하네스 (풀스택 웹 개발)
 
 12개의 에이전트 페르소나와 13개의 스킬로 구성된, **애자일 SDLC 전체를 자동으로 굴리는 하네스**다. 요구사항 분석 ➔ 아키텍처 설계 ➔ 티켓팅 ➔ TDD 병렬 개발 ➔ E2E 검증 ➔ PR 생성 ➔ 문서화까지를 페이즈별 에이전트 팀으로 나눠 수행한다.
+
+패키지는 두 벌의 소스 트리를 담고 있다 — `.claude/`(Claude Code용, Phase 3 Track A에서 에이전트 팀 모드·P2P 통신 사용)와 `.codex/`(Codex CLI용, Codex의 서브에이전트가 오케스트레이터에게만 보고하는 허브-스포크 구조라 P2P 대신 순차 위임 사용). 라우팅·페이즈 골격은 같지만 실행 방식이 다르므로 설치 시 표면을 고른다(「설치」 참고).
 
 ## 핵심 원리: 기술 스택을 전제하지 않는다
 
@@ -213,13 +215,17 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 (배포 자산 — 대상 프로젝트로 복사되지 않는다)
 ├── .gitattributes                 # EOL 고정. *.mjs는 eol=lf (shebang이 CRLF면 Unix 실행 불가)
 ├── package.json                   # 하네스 배포용. 의존성 0, prepublishOnly 게이트
-└── bin/cli.mjs                    # npx 스캐폴더 (init / update / --preflight)
+└── bin/cli.mjs                    # npx 스캐폴더 (init / update / --preflight / --claude / --codex)
 
-.claude/tools/
+(설치되는 두 표면 — 설치 옵션에 따라 한쪽 또는 둘 다)
+.claude/{agents,skills,tools}/     # Claude Code용. Track A에 P2P 팀 모드 사용
+.codex/{agents,skills,tools}/      # Codex CLI용. 항상 허브-스포크(순차 위임) 사용
+
+tools/ 안 내용은 두 표면 모두 동일한 원본 하나에서 복사된다:
 ├── inject-design.mjs              # design.md ➔ 에이전트 시스템 프롬프트 정적 주입기
 └── inject-design.test.mjs         # 주입기 회귀 테스트 (node --test)
 
-.claude/_workspace/
+.claude/_workspace/                # 표면과 무관하게 이 경로 하나만 쓴다 (design.md는 두 표면의 공유 SSOT)
 │
 ├── (추적) 합의물 — 커밋 대상
 │   ├── 01_architecture/design.md  # 기술 스택·규약·소유권 (SSOT)
@@ -231,6 +237,8 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
     ├── handoff/phase-<N>.md       # 페이즈 인계 파일 (Rule 6)
     └── log/orchestrator-log.jsonl # 페이즈 감사 로그
 ```
+
+`--codex` 단독 설치에서도 `.claude/` 디렉터리 자체는 생기지만, 그 안에는 `_workspace/`만 있고 `agents/`·`skills/`는 없다 — 두 런타임이 같은 프로젝트에서 다른 `design.md`를 SSOT로 보면 안 되기 때문이다.
 
 미추적 세 경로는 세션마다 새로 생기고 재현 가능한 휘발성 상태다. 스테이징하거나 커밋하지 않는다.
 
@@ -248,32 +256,48 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 - **난이도는 라우트와 직교한다** — 라우트가 어느 페이즈를 도는지 정하고, 난이도가 얼마나 두껍게 도는지 정한다. 애매하면 Heavy로 편향한다. 오분류 비용이 비대칭이기 때문이다.
 - **역할을 늘리기보다 인스턴스를 복제한다** — 주입 방식 때문에 새 agent type은 캐시 접두사를 하나 더 만들고, 파이프라인당 1회 스폰이면 그 미스를 회수할 기회가 없다. 병렬화가 필요하면 파일 트리가 겹치지 않는 축으로 같은 타입을 복제한다.
 - **판정 한 필드가 조직도를 대체한다** — 실패를 어느 역할에 넘길지는 리더 계층이 있어야 정해지는 것이 아니다. `e2e-tester`의 `area` 한 필드로 재스폰 대상이 결정되므로, 계층을 늘리지 않고 핀포인트 라우팅이 성립한다.
-- **P2P 통신은 Track A 한정** — 팀 모드는 Phase 3 Track A(QA ↔ Developer ↔ Reviewer)에만 쓴다. 그 구간의 팀원은 리더를 거치지 않고 서로 직접 `SendMessage`로 피드백 루프를 돈다. 그 밖의 역할은 모두 서브 에이전트이며 **발신 대상이 없다** — 다른 역할에 전달할 내용은 최종 보고에 담고 오케스트레이터가 중계한다. 브로드캐스트(`to: "all"`)는 쓰지 않는다.
+- **P2P 통신은 Claude Code 표면의 Track A 한정** — Claude Code에서는 팀 모드를 Phase 3 Track A(QA ↔ Developer ↔ Reviewer)에만 쓴다. 그 구간의 팀원은 리더를 거치지 않고 서로 직접 `SendMessage`로 피드백 루프를 돈다. 그 밖의 역할은 모두 서브 에이전트이며 **발신 대상이 없다** — 다른 역할에 전달할 내용은 최종 보고에 담고 오케스트레이터가 중계한다. 브로드캐스트(`to: "all"`)는 쓰지 않는다.
+- **Codex 표면은 항상 허브-스포크** — Codex 서브에이전트에는 팀원 간 상시 채널이 없으므로, `.codex/skills/run_web_sdlc/SKILL.md`는 Track A도 Track B와 같은 방식(순차 위임 + 오케스트레이터 중계)으로 진행한다. 두 표면의 라우팅·페이즈 골격은 같지만 이 지점만 다르다.
 - **메인 브랜치 보호** — `issue-pm`이 이슈 번호 기반 `<타입>/<이슈번호>-<슬러그>` 브랜치를 먼저 따고, 그 위에서만 개발이 진행된다.
 
 ## 설치
 
-대상 프로젝트 루트에서 실행한다. 배포 단위는 실행 파일이 아니라 `.claude/` 파일 트리이므로, 설치란 에이전트·스킬·툴 정의를 프로젝트에 놓는 일이다.
+대상 프로젝트 루트에서 실행한다. 배포 단위는 실행 파일이 아니라 파일 트리(`.claude/`·`.codex/`)이므로, 설치란 에이전트·스킬·툴 정의를 프로젝트에 놓는 일이다.
 
 ```bash
-npx github:nyj001012/web-sdlc-harness            # 신규 설치
-npx github:nyj001012/web-sdlc-harness update     # 코어만 최신화 (사용자 자산 보존)
-npx github:nyj001012/web-sdlc-harness --dry-run  # 쓰지 않고 계획만 확인
-npx github:nyj001012/web-sdlc-harness --help     # 전체 옵션
+npx github:nyj001012/web-sdlc-harness              # 신규 설치 — 옵션 없으면 두 표면(.claude/·.codex/) 모두
+npx github:nyj001012/web-sdlc-harness --claude      # Claude Code 표면만 설치
+npx github:nyj001012/web-sdlc-harness --codex       # Codex 표면만 설치
+npx github:nyj001012/web-sdlc-harness update        # 코어만 최신화 (사용자 자산 보존, 옵션으로 표면 지정 가능)
+npx github:nyj001012/web-sdlc-harness --dry-run     # 쓰지 않고 계획만 확인
+npx github:nyj001012/web-sdlc-harness --help        # 전체 옵션
 ```
 
 > 아직 npm 레지스트리에 게시되지 않았다. `npx web-sdlc-harness`처럼 패키지명만 주면 레지스트리를 조회해 404로 실패하므로, `github:` 스펙을 붙여 저장소에서 직접 받는다. 이 방식은 로컬에 `git`이 필요하다.
 
+**CLI 자체를 전역 설치할 수도 있다:**
+
+```bash
+npm install -g github:nyj001012/web-sdlc-harness
+web-sdlc-harness --target ./my-project   # 이후 npx 없이 바로 실행
+```
+
+전역 설치되는 것은 이 실행 파일 하나뿐이다. 에이전트·스킬 정의(`design.md` 주입 대상)는 여전히 명령을 실행한 프로젝트에만 놓인다 — 정의 파일 자체를 홈 디렉터리 등 전역 한 벌로 두면 여러 프로젝트가 서로의 `<design_spec>` 주입 결과를 덮어쓰게 되기 때문이다 (`bin/cli.mjs` 상단 설명 참고).
+
 - **기존 프로젝트에 얹는 것이 기본 사용 사례다.** 대상에 이미 있는 파일과 충돌하면 **아무것도 쓰지 않고** 목록을 보여주며 멈춘다. 전부 덮어쓰려면 `--force`.
-- `.gitignore`에 런타임 3경로를 중복 없이 덧붙인다. 기존 내용은 덮어쓰지 않는다.
-- `update`는 코어(`agents/`·`skills/`·`tools/`)만 교체한다. `_workspace/`의 `design.md`·계약과 `.claude/settings*.json`은 손대지 않으며, 대상에만 있는 파일(자체 스킬 등)은 지우지 않고 보고만 한다.
-- ⚠️ `update`는 `agents/`를 교체하므로 주입 블록이 사라진다. 최신화 후 `node .claude/tools/inject-design.mjs`로 재주입한다.
+- `.gitignore`에 런타임 3경로를 중복 없이 덧붙인다. 기존 내용은 덮어쓰지 않는다. 이 경로는 표면 선택과 무관하게 항상 `.claude/_workspace/` 밑이다 (「산출물 구조」 참고).
+- `update`는 선택한 표면의 코어(`agents/`·`skills/`·`tools/`)만 교체한다. `_workspace/`의 `design.md`·계약과 `.claude/settings*.json`·`.codex/config.toml` 등은 손대지 않으며, 대상에만 있는 파일(자체 스킬 등)은 지우지 않고 보고만 한다.
+- ⚠️ `update`는 `agents/`를 교체하므로 주입 블록이 사라진다. 최신화 후 해당 표면의 `node <표면>/tools/inject-design.mjs`로 재주입한다.
+
+### Codex 지원 범위
+
+`.codex/`는 `.claude/`와 라우팅·페이즈 골격이 같지만, Codex의 서브에이전트가 오케스트레이터에게만 결과를 보고하는 허브-스포크 구조라 P2P 팀 모드에 대응하는 기능이 없다. 그래서 Claude Code 표면이 Phase 3 Track A에서 쓰는 QA↔Developer↔Reviewer↔DB 팀 핑퐁을, Codex 표면은 **서브 에이전트 순차 위임**으로 대체한다 — 결과는 같지만 데이터 레인의 조기 언블록(스키마 확정 즉시 BE 착수) 같은 P2P 전용 최적화는 포기한다. 정확한 차이는 `.codex/skills/run_web_sdlc/SKILL.md`의 Rule 1·Phase 3에 문서화돼 있다. 두 표면을 함께 설치해도 `design.md`는 하나(`.claude/_workspace/`)를 공유한다.
 
 ### 전제: Node.js가 필요하다
 
 **이 하네스는 Node.js를 요구한다.** 주입기(`inject-design.mjs`)가 Node 스크립트이고, `run_web_sdlc`는 Phase 0에서 이것을 실행해 설계 명세를 주입한다. 주입이 실패하면 하위 에이전트 전원이 스택 명세 없이 작업하게 되므로 선택 사항이 아니다.
 
-Claude Code를 **네이티브 인스톨러로 설치한 환경에는 Node가 없을 수 있다.** 그 경우 Node를 별도로 설치해야 한다 (`engines` 하한은 16.7 — `fs.cpSync` 도입 버전).
+Claude Code·Codex CLI를 **네이티브 인스톨러로 설치한 환경에는 Node가 없을 수 있다.** 그 경우 Node를 별도로 설치해야 한다 (`engines` 하한은 16.7 — `fs.cpSync` 도입 버전).
 
 `run_web_sdlc`는 **Phase 0에서 런타임을 선행 검사하고, Node가 없으면 그 자리에서 멈춘다.** 라우트 판별 직후·주입 이전에 확인하므로, 주입 실패를 "`design.md`가 불완전하다"로 오진해 명세 없이 개발에 들어가는 경로가 차단된다. 하네스 자체를 손보는 하네스 메타 라우트도 예외가 아니다 — 주입은 생략하지만 회귀 테스트와 배포 오염 검사가 Node를 쓴다.
 
@@ -281,7 +305,8 @@ Claude Code를 **네이티브 인스톨러로 설치한 환경에는 Node가 없
 
 ```bash
 git clone --depth 1 https://github.com/nyj001012/web-sdlc-harness.git /tmp/harness
-cp -r /tmp/harness/.claude/{agents,skills,tools} <대상>/.claude/
+cp -r /tmp/harness/.claude/{agents,skills,tools} <대상>/.claude/   # Claude Code 표면
+cp -r /tmp/harness/.codex/{agents,skills,tools} <대상>/.codex/     # Codex 표면 (필요한 쪽만)
 ```
 
 이 경우 `.gitignore` 병합과 충돌 검사는 직접 해야 한다. 「산출물 구조」의 미추적 세 경로를 참고하라.
@@ -291,10 +316,10 @@ cp -r /tmp/harness/.claude/{agents,skills,tools} <대상>/.claude/
 ## 사용법
 
 1. 위 설치를 마친다.
-2. Claude Code에서 하고 싶은 작업을 요청한다. (예: "센서 관제 대시보드를 만들어줘", "로그인 API만 구현해줘")
+2. Claude Code 또는 Codex CLI에서 하고 싶은 작업을 요청한다. (예: "센서 관제 대시보드를 만들어줘", "로그인 API만 구현해줘")
 3. `run_web_sdlc`가 요청 성격에 맞는 페이즈만 골라 실행하며, 에이전트 스폰 전에 `inject-design.mjs`를 돌려 설계 명세를 주입한다.
 
-> ⚠️ 파이프라인 도중 `design.md`가 갱신되면 주입 스크립트가 에이전트 정의 파일을 다시 쓴다. 이때 Claude Code가 세션 시작 시점의 에이전트 정의를 잡고 있으면 갱신이 반영되지 않는다. 오케스트레이터는 에이전트가 반환한 `DESIGN_FINGERPRINT`로 이를 감지하며, 불일치 시 세션 재시작을 요청한다.
+> ⚠️ 파이프라인 도중 `design.md`가 갱신되면 주입 스크립트가 에이전트 정의 파일을 다시 쓴다. 이때 Claude Code·Codex가 세션 시작 시점의 에이전트 정의를 잡고 있으면 갱신이 반영되지 않는다. 오케스트레이터는 에이전트가 반환한 `DESIGN_FINGERPRINT`로 이를 감지하며, 불일치 시 세션 재시작을 요청한다.
 
 기존 코드베이스가 있는 프로젝트라면 Phase 0에서 현행 스택을 조사해 `design.md`에 기록한 뒤 개발에 들어간다. 신규 프로젝트라면 Phase 1에서 스택을 새로 확정한다. 어느 쪽도 불가능하면 파이프라인은 추측하지 않고 멈춰서 사용자에게 스택 결정을 묻는다.
 
