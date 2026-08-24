@@ -30,7 +30,7 @@ const CR = String.fromCharCode(13);
 const LF = String.fromCharCode(10);
 const CRLF = CR + LF;
 
-/** 주입 대상 계약. 이 집합 자체가 고정 대상이다 (run_pipeline Rule 5). */
+/** 주입 대상 계약. 이 집합 자체가 고정 대상이다 (run_web_sdlc Rule 5). */
 const TARGETS = [
   'backend-developer',
   'backend-qa',

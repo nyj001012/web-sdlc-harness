@@ -1,4 +1,4 @@
-# claude-harness-fullstack
+# web-sdlc-harness
 
 클로드 코드를 이용할 때 사용할 하네스 (풀스택 웹 개발)
 
@@ -65,7 +65,7 @@ node .claude/tools/inject-design.mjs --clear    # 주입 블록 제거, 하네�
 
 ## 파이프라인
 
-`run_pipeline` 스킬이 마스터 오케스트레이터로서 페이즈를 동적 라우팅한다.
+`run_web_sdlc` 스킬이 마스터 오케스트레이터로서 페이즈를 동적 라우팅한다.
 
 | Phase | 하는 일 | 투입 에이전트 |
 |---|---|---|
@@ -191,7 +191,7 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 
 | 스킬 | 용도 |
 |---|---|
-| `run_pipeline` | 마스터 오케스트레이터 (페이즈 라우팅·팀 스폰·커밋) |
+| `run_web_sdlc` | 마스터 오케스트레이터 (페이즈 라우팅·팀 스폰·커밋) |
 | `design_system_architecture` | 기술 스택 선정 및 시스템 설계 |
 | `create_agile_issues` | 이슈 생성 및 작업 브랜치 파생 |
 | `design_interface_contracts` | 풀스택 인터페이스·데이터 계약 설계 |
@@ -256,13 +256,13 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 대상 프로젝트 루트에서 실행한다. 배포 단위는 실행 파일이 아니라 `.claude/` 파일 트리이므로, 설치란 에이전트·스킬·툴 정의를 프로젝트에 놓는 일이다.
 
 ```bash
-npx github:nyj001012/claude-harness-fullstack            # 신규 설치
-npx github:nyj001012/claude-harness-fullstack update     # 코어만 최신화 (사용자 자산 보존)
-npx github:nyj001012/claude-harness-fullstack --dry-run  # 쓰지 않고 계획만 확인
-npx github:nyj001012/claude-harness-fullstack --help     # 전체 옵션
+npx github:nyj001012/web-sdlc-harness            # 신규 설치
+npx github:nyj001012/web-sdlc-harness update     # 코어만 최신화 (사용자 자산 보존)
+npx github:nyj001012/web-sdlc-harness --dry-run  # 쓰지 않고 계획만 확인
+npx github:nyj001012/web-sdlc-harness --help     # 전체 옵션
 ```
 
-> 아직 npm 레지스트리에 게시되지 않았다. `npx claude-harness-fullstack`처럼 패키지명만 주면 레지스트리를 조회해 404로 실패하므로, `github:` 스펙을 붙여 저장소에서 직접 받는다. 이 방식은 로컬에 `git`이 필요하다.
+> 아직 npm 레지스트리에 게시되지 않았다. `npx web-sdlc-harness`처럼 패키지명만 주면 레지스트리를 조회해 404로 실패하므로, `github:` 스펙을 붙여 저장소에서 직접 받는다. 이 방식은 로컬에 `git`이 필요하다.
 
 - **기존 프로젝트에 얹는 것이 기본 사용 사례다.** 대상에 이미 있는 파일과 충돌하면 **아무것도 쓰지 않고** 목록을 보여주며 멈춘다. 전부 덮어쓰려면 `--force`.
 - `.gitignore`에 런타임 3경로를 중복 없이 덧붙인다. 기존 내용은 덮어쓰지 않는다.
@@ -271,16 +271,16 @@ npx github:nyj001012/claude-harness-fullstack --help     # 전체 옵션
 
 ### 전제: Node.js가 필요하다
 
-**이 하네스는 Node.js를 요구한다.** 주입기(`inject-design.mjs`)가 Node 스크립트이고, `run_pipeline`은 Phase 0에서 이것을 실행해 설계 명세를 주입한다. 주입이 실패하면 하위 에이전트 전원이 스택 명세 없이 작업하게 되므로 선택 사항이 아니다.
+**이 하네스는 Node.js를 요구한다.** 주입기(`inject-design.mjs`)가 Node 스크립트이고, `run_web_sdlc`는 Phase 0에서 이것을 실행해 설계 명세를 주입한다. 주입이 실패하면 하위 에이전트 전원이 스택 명세 없이 작업하게 되므로 선택 사항이 아니다.
 
 Claude Code를 **네이티브 인스톨러로 설치한 환경에는 Node가 없을 수 있다.** 그 경우 Node를 별도로 설치해야 한다 (`engines` 하한은 16.7 — `fs.cpSync` 도입 버전).
 
-`run_pipeline`은 **Phase 0에서 런타임을 선행 검사하고, Node가 없으면 그 자리에서 멈춘다.** 라우트 판별 직후·주입 이전에 확인하므로, 주입 실패를 "`design.md`가 불완전하다"로 오진해 명세 없이 개발에 들어가는 경로가 차단된다. 하네스 자체를 손보는 하네스 메타 라우트도 예외가 아니다 — 주입은 생략하지만 회귀 테스트와 배포 오염 검사가 Node를 쓴다.
+`run_web_sdlc`는 **Phase 0에서 런타임을 선행 검사하고, Node가 없으면 그 자리에서 멈춘다.** 라우트 판별 직후·주입 이전에 확인하므로, 주입 실패를 "`design.md`가 불완전하다"로 오진해 명세 없이 개발에 들어가는 경로가 차단된다. 하네스 자체를 손보는 하네스 메타 라우트도 예외가 아니다 — 주입은 생략하지만 회귀 테스트와 배포 오염 검사가 Node를 쓴다.
 
 `npx`로 받을 수 없는 환경이라면 수동 복사가 폴백이다.
 
 ```bash
-git clone --depth 1 https://github.com/nyj001012/claude-harness-fullstack.git /tmp/harness
+git clone --depth 1 https://github.com/nyj001012/web-sdlc-harness.git /tmp/harness
 cp -r /tmp/harness/.claude/{agents,skills,tools} <대상>/.claude/
 ```
 
@@ -292,7 +292,7 @@ cp -r /tmp/harness/.claude/{agents,skills,tools} <대상>/.claude/
 
 1. 위 설치를 마친다.
 2. Claude Code에서 하고 싶은 작업을 요청한다. (예: "센서 관제 대시보드를 만들어줘", "로그인 API만 구현해줘")
-3. `run_pipeline`이 요청 성격에 맞는 페이즈만 골라 실행하며, 에이전트 스폰 전에 `inject-design.mjs`를 돌려 설계 명세를 주입한다.
+3. `run_web_sdlc`가 요청 성격에 맞는 페이즈만 골라 실행하며, 에이전트 스폰 전에 `inject-design.mjs`를 돌려 설계 명세를 주입한다.
 
 > ⚠️ 파이프라인 도중 `design.md`가 갱신되면 주입 스크립트가 에이전트 정의 파일을 다시 쓴다. 이때 Claude Code가 세션 시작 시점의 에이전트 정의를 잡고 있으면 갱신이 반영되지 않는다. 오케스트레이터는 에이전트가 반환한 `DESIGN_FINGERPRINT`로 이를 감지하며, 불일치 시 세션 재시작을 요청한다.
 

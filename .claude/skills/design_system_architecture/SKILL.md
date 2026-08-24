@@ -47,7 +47,7 @@ allowed-tools:
 
 6. **산출물 교차 검증 및 적재 (Documentation & P2P Review)**
    - **자체 반론 검토:** 설계안의 취약점(특히 스택 선정 근거)을 스스로 열거하고, 각각에 대한 방어 근거 또는 감수하는 트레이드오프를 `design.md`에 남긴다. 반론을 세우지 못한 선택은 근거가 약한 선택이다.
-   - `system-architect`는 서브 에이전트이므로 다른 아키텍트와 `SendMessage` 핑퐁을 돌릴 수 없다 (run_pipeline Rule 1).
+   - `system-architect`는 서브 에이전트이므로 다른 아키텍트와 `SendMessage` 핑퐁을 돌릴 수 없다 (run_web_sdlc Rule 1).
    - 🚨 **자기완결성 요건:** 하위 에이전트는 이 파일을 **읽지 않는다.** 하네스가 `node .claude/tools/inject-design.mjs`로 전문을 각 에이전트의 시스템 프롬프트에 정적 주입한다. 따라서 "자세한 건 X 파일 참고"처럼 외부로 미루지 말고, 하위 팀이 필요로 하는 결정을 이 한 파일 안에서 끝낸다.
    - 최종 설계안을 `.claude/_workspace/01_architecture/design.md`에 저장한다. 아래 목차를 **필수**로 갖춘다.
      1. 요구사항 요약 및 제약

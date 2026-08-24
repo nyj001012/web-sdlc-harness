@@ -1,5 +1,5 @@
 {
-  "name": "claude-harness-fullstack",
+  "name": "web-sdlc-harness",
   "version": "0.1.0",
   "description": "Claude Code 애자일 SDLC 하네스 — 12개 에이전트 페르소나와 13개 스킬, 기술 스택 무관",
   "keywords": [
@@ -12,16 +12,16 @@
     "tdd",
     "scaffolding"
   ],
-  "homepage": "https://github.com/nyj001012/claude-harness-fullstack#readme",
-  "bugs": "https://github.com/nyj001012/claude-harness-fullstack/issues",
+  "homepage": "https://github.com/nyj001012/web-sdlc-harness#readme",
+  "bugs": "https://github.com/nyj001012/web-sdlc-harness/issues",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/nyj001012/claude-harness-fullstack.git"
+    "url": "git+https://github.com/nyj001012/web-sdlc-harness.git"
   },
   "author": "nyj001012",
   "license": "MIT",
   "bin": {
-    "claude-harness-fullstack": "bin/cli.mjs"
+    "web-sdlc-harness": "bin/cli.mjs"
   },
   "files": [
     ".claude/agents/**",
