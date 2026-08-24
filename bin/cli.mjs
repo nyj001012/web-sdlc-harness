@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 /**
- * claude-harness-fullstack — 하네스 스캐폴더 (Harness Scaffolder)
+ * web-sdlc-harness — 하네스 스캐폴더 (Harness Scaffolder)
  *
  * 목적:
  *   이 하네스의 배포 단위는 실행 파일이 아니라 `.claude/` 파일 트리다.
- *   오케스트레이터는 프로그램이 아니라 `run_pipeline/SKILL.md` 프롬프트이며,
+ *   오케스트레이터는 프로그램이 아니라 `run_web_sdlc/SKILL.md` 프롬프트이며,
  *   파이프라인을 구동하는 주체는 Claude Code 런타임이다.
  *   따라서 "설치"란 대상 프로젝트에 에이전트·스킬·툴 정의를 놓는 일이다.
  *
@@ -22,9 +22,9 @@
  *
  * 사용법 (npm 미게시 상태이므로 `github:` 스펙으로 저장소에서 직접 받는다.
  * 패키지명만 주면 레지스트리를 조회해 404로 실패한다):
- *   npx github:nyj001012/claude-harness-fullstack            # init (기본) — 신규 설치
- *   npx github:nyj001012/claude-harness-fullstack update     # 코어만 최신화, 사용자 자산 보존
- *   npx github:nyj001012/claude-harness-fullstack --dry-run  # 쓰지 않고 계획만 출력
+ *   npx github:nyj001012/web-sdlc-harness            # init (기본) — 신규 설치
+ *   npx github:nyj001012/web-sdlc-harness update     # 코어만 최신화, 사용자 자산 보존
+ *   npx github:nyj001012/web-sdlc-harness --dry-run  # 쓰지 않고 계획만 출력
  *   node bin/cli.mjs --preflight                             # 배포 전 오염 검사 (publish 게이트)
  */
 
@@ -63,7 +63,7 @@ const IGNORE_ENTRIES = [
   '.claude/_workspace/handoff/',
   '.claude/_workspace/02_issues/',
 ];
-const IGNORE_HEADER = '# claude-harness-fullstack 런타임 산출물 (재현 가능하므로 추적하지 않는다)';
+const IGNORE_HEADER = '# web-sdlc-harness 런타임 산출물 (재현 가능하므로 추적하지 않는다)';
 
 /** 주입 블록 시작 표지. `inject-design.mjs`의 BEGIN과 같은 값이어야 한다. */
 const INJECT_BEGIN = '<!-- DESIGN_SPEC:BEGIN -->';
@@ -213,7 +213,7 @@ function init() {
 
   console.log('');
   log('\u2713 설치 완료.');
-  log('  Claude Code를 열고 하고 싶은 작업을 요청하면 run_pipeline이 라우팅한다.');
+  log('  Claude Code를 열고 하고 싶은 작업을 요청하면 run_web_sdlc가 라우팅한다.');
   log('  예: "센서 관제 대시보드를 만들어줘", "로그인 API만 구현해줘"');
   log('  기술 스택은 Phase 1에서 system-architect가 확정한다 \u2014 design.md를 직접 쓸 필요는 없다.');
 }
@@ -232,7 +232,7 @@ function init() {
  */
 function update() {
   if (!isInstalled()) {
-    fail(`대상에 하네스가 없다: ${TARGET_ROOT}\n           \u2192 먼저 \`npx github:nyj001012/claude-harness-fullstack\` 로 설치하라.`);
+    fail(`대상에 하네스가 없다: ${TARGET_ROOT}\n           \u2192 먼저 \`npx github:nyj001012/web-sdlc-harness\` 로 설치하라.`);
   }
 
   const sources = readSources();
@@ -366,9 +366,9 @@ function preflight() {
 // 실행
 // ─────────────────────────────────────────────────────────────
 const HELP = `
-claude-harness-fullstack \u2014 Claude Code 애자일 SDLC 하네스 스캐폴더
+web-sdlc-harness \u2014 Claude Code 애자일 SDLC 하네스 스캐폴더
 
-  npx github:nyj001012/claude-harness-fullstack [명령] [옵션]
+  npx github:nyj001012/web-sdlc-harness [명령] [옵션]
 
   npm 레지스트리에 미게시 상태다. 패키지명만 주면 404로 실패하므로 \`github:\` 스펙을 쓴다.
 

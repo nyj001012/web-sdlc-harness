@@ -40,7 +40,7 @@ allowed-tools:
 6. **문법 검증 및 교차 검토 (Validation & Peer Review)**
    - `Bash` 도구로 작성된 설정·스크립트의 문법을 정적 검증한다. (설정 파서 검사, 파이프라인 린트, 셸 문법 검사 등)
    - 보안·성능 결함은 **자체 점검으로 확인한다.** 점검 항목과 결과, 판단이 갈린 지점을 최종 보고에 기재해 오케스트레이터가 판단할 수 있게 한다.
-   - `devops-engineer`는 서브 에이전트이므로 다른 DevOps 팀원에게 `SendMessage`를 보낼 수 없다 (run_pipeline Rule 1).
+   - `devops-engineer`는 서브 에이전트이므로 다른 DevOps 팀원에게 `SendMessage`를 보낼 수 없다 (run_web_sdlc Rule 1).
 
 ## Why (왜 이렇게 하는가?)
 
