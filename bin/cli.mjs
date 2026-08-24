@@ -17,6 +17,13 @@
  *   두 표면 모두에 같은 파일을 복사한다 — 두 벌을 따로 관리하면 한쪽만 고치는
  *   드리프트가 생기기 때문이다.
  *
+ * 예외: Codex의 스킬 배치 경로.
+ *   Codex CLI는 스킬(SKILL.md)을 `.codex/` 밑이 아니라 저장소 루트 기준
+ *   `.agents/skills/`에서 탐색한다(공식 문서 확인). 그래서 `codex` 표면만
+ *   `skills`의 목적지가 `.codex/skills`가 아니라 `.agents/skills`다 — 아래
+ *   `surfacePath()`가 이 예외 하나만 처리한다. Codex 에이전트(`.codex/agents/*.toml`)와
+ *   공유 `tools/`는 이 예외 밖이다.
+ *
  * 설계 명세(design.md)와 워크스페이스는 표면과 무관하게 하나다:
  *   `.claude/_workspace/`는 표면을 고르지 않는다. Claude 전용 설치(`--codex` 없이)든
  *   Codex 전용 설치(`--codex`)든 항상 `.claude/_workspace/`에 고정한다. 두 런타임이
@@ -25,7 +32,7 @@
  *   자체는 생기지만, 그 안에는 `_workspace/`만 있고 `agents/`·`skills/`는 없다.
  *
  * 왜 전역 설치가 아니라 프로젝트별 복사인가:
- *   `inject-design.mjs`는 각 표면의 `agents/*.md`를 제자리에서 다시 쓴다.
+ *   `inject-design.mjs`는 각 표면의 에이전트 정의 파일(`.claude/agents/*.md`, `.codex/agents/*.toml`)을 제자리에서 다시 쓴다.
  *   정의 파일 자체를 홈 디렉터리 등 전역 한 벌로 두면 여러 프로젝트가 같은
  *   정의 파일을 공유하며 서로의 `<design_spec>` 블록을 덮어쓴다. 프로젝트 A에
  *   Spring 명세를 주입한 뒤 프로젝트 B가 FastAPI 명세를 주입하면 A가 조용히
@@ -130,7 +137,18 @@ const targetValue = valueOf('--target');
 const COMMAND = positional.filter((a) => a !== targetValue)[0] ?? 'init';
 
 const toPosix = (p) => p.split('\\').join('/');
-const targetDirOf = (surface) => join(TARGET_ROOT, SURFACE_DIRNAME[surface]);
+
+/**
+ * 표면·코어 디렉터리 이름을 프로젝트 루트 기준 상대 경로로 바꾼다.
+ * 대부분은 `<표면 디렉터리>/<name>`이지만, Codex의 `skills`만 `.agents/skills`로
+ * 나간다(파일 상단 "예외" 설명 참고). 이 함수 하나로 그 예외를 흡수해서,
+ * 나머지 코드는 표면 디렉터리를 직접 조립하지 않고 전부 이 함수를 거친다.
+ */
+function surfacePath(surface, name) {
+  if (surface === 'codex' && name === 'skills') return join('.agents', 'skills');
+  return join(SURFACE_DIRNAME[surface], name);
+}
+
 
 // ─────────────────────────────────────────────────────────────
 // 유틸
@@ -160,7 +178,7 @@ const log = (message) => console.log(`[harness] ${message}`);
 function readSources(surface) {
   const sources = COPY_DIRS.map((name) => {
     const srcSurface = SOURCE_SURFACE_OVERRIDE[name] ?? surface;
-    return { name, surface, src: join(PKG_ROOT, SURFACE_DIRNAME[srcSurface], name) };
+    return { name, surface, src: join(PKG_ROOT, surfacePath(srcSurface, name)) };
   });
   const missing = sources.filter((s) => !existsSync(s.src));
   if (missing.length) {
@@ -171,15 +189,13 @@ function readSources(surface) {
 
 /** 대상에 어떤 표면이든 하네스 코어가 있는지 — update 진입 가능 여부 판단용. */
 const isInstalledAnywhere = () =>
-  ALL_SURFACES.some((surface) => COPY_DIRS.some((d) => existsSync(join(targetDirOf(surface), d))));
+  ALL_SURFACES.some((surface) => COPY_DIRS.some((d) => existsSync(join(TARGET_ROOT, surfacePath(surface, d)))));
 
 /** 대상 `<surface>/agents/`에 주입 블록이 남아 있는 파일 목록. update 후 재주입 안내에 쓴다. */
 function injectedAgents(surface) {
-  const dir = join(targetDirOf(surface), 'agents');
+  const dir = join(TARGET_ROOT, surfacePath(surface, 'agents'));
   if (!existsSync(dir)) return [];
-  return walk(dir)
-    .filter((f) => f.endsWith('.md'))
-    .filter((f) => readFileSync(join(dir, f), 'utf8').includes(INJECT_BEGIN));
+  return walk(dir).filter((f) => readFileSync(join(dir, f), 'utf8').includes(INJECT_BEGIN));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -233,8 +249,8 @@ function init() {
     for (const { name, files } of sources) {
       for (const f of files) {
         planned += 1;
-        if (existsSync(join(targetDirOf(surface), name, f))) {
-          conflicts.push(toPosix(join(SURFACE_DIRNAME[surface], name, f)));
+        if (existsSync(join(TARGET_ROOT, surfacePath(surface, name), f))) {
+          conflicts.push(toPosix(join(surfacePath(surface, name), f)));
         }
       }
     }
@@ -256,12 +272,14 @@ function init() {
 
   if (!DRY_RUN) {
     for (const { surface, sources } of bySurface) {
-      for (const { name, src } of sources) cpSync(src, join(targetDirOf(surface), name), { recursive: true, force: true });
+      for (const { name, src } of sources) {
+        cpSync(src, join(TARGET_ROOT, surfacePath(surface, name)), { recursive: true, force: true });
+      }
     }
     for (const parts of ENSURE_DIRS) mkdirSync(join(TARGET_ROOT, '.claude', ...parts), { recursive: true });
   }
   for (const { surface, sources } of bySurface) {
-    for (const { name, files } of sources) console.log(`  - ${SURFACE_DIRNAME[surface]}/${name}/ (${files.length}건)`);
+    for (const { name, files } of sources) console.log(`  - ${toPosix(surfacePath(surface, name))}/ (${files.length}건)`);
   }
   for (const parts of ENSURE_DIRS) console.log(`  - .claude/${parts.join('/')}/ (빈 디렉터리)`);
   reportGitignore(mergeGitignore());
@@ -301,11 +319,11 @@ function update() {
   const orphans = [];
   for (const { surface, sources } of bySurface) {
     for (const { name, files } of sources) {
-      const destDir = join(targetDirOf(surface), name);
+      const destDir = join(TARGET_ROOT, surfacePath(surface, name));
       if (!existsSync(destDir)) continue;
       const known = new Set(files.map(toPosix));
       for (const f of walk(destDir)) {
-        if (!known.has(toPosix(f))) orphans.push(toPosix(join(SURFACE_DIRNAME[surface], name, f)));
+        if (!known.has(toPosix(f))) orphans.push(toPosix(join(surfacePath(surface, name), f)));
       }
     }
   }
@@ -317,12 +335,14 @@ function update() {
 
   if (!DRY_RUN) {
     for (const { surface, sources } of bySurface) {
-      for (const { name, src } of sources) cpSync(src, join(targetDirOf(surface), name), { recursive: true, force: true });
+      for (const { name, src } of sources) {
+        cpSync(src, join(TARGET_ROOT, surfacePath(surface, name)), { recursive: true, force: true });
+      }
     }
     for (const parts of ENSURE_DIRS) mkdirSync(join(TARGET_ROOT, '.claude', ...parts), { recursive: true });
   }
   for (const { surface, sources } of bySurface) {
-    for (const { name, files } of sources) console.log(`  - ${SURFACE_DIRNAME[surface]}/${name}/ (${files.length}건 교체)`);
+    for (const { name, files } of sources) console.log(`  - ${toPosix(surfacePath(surface, name))}/ (${files.length}건 교체)`);
   }
   console.log('  - .claude/_workspace/ : 손대지 않았다 (design.md·계약은 사용자 자산)');
   console.log('  - .claude/settings*.json, .codex/config.toml 등 : 손대지 않았다 (복사 범위 밖)');
@@ -369,9 +389,7 @@ function preflight() {
       problems.push(`에이전트 정의 디렉터리가 없다: ${toPosix(relative(PKG_ROOT, agentsDir))}`);
       continue;
     }
-    const dirty = walk(agentsDir)
-      .filter((f) => f.endsWith('.md'))
-      .filter((f) => readFileSync(join(agentsDir, f), 'utf8').includes(INJECT_BEGIN));
+    const dirty = walk(agentsDir).filter((f) => readFileSync(join(agentsDir, f), 'utf8').includes(INJECT_BEGIN));
     if (dirty.length) {
       problems.push(
         `${SURFACE_DIRNAME[surface]}/agents에 주입 블록이 남아 있다 (${dirty.length}건): ${dirty.map(toPosix).join(', ')}\n` +

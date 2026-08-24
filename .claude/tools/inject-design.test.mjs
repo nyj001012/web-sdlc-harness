@@ -302,22 +302,36 @@ test('대상 에이전트 정의가 없으면 missing으로 보고하고 exit 1�
 
 // ── 두 표면(.claude/.codex) 공존 (Codex 지원) ────────────────────
 
+/** Codex 표면 픽스처용 최소 TOML 에이전트. `developer_instructions` 리터럴 문자열을 갖춘다. */
+const agentSourceToml = (name) =>
+  [`name = "${name}"`, 'description = "픽스처"', '', "developer_instructions = '''", `# ${name}`, '', '본문 한 줄.', "'''", ''].join(
+    LF,
+  );
+
+const EXT_BY_SURFACE = { claude: '.md', codex: '.toml' };
+const SOURCE_BY_SURFACE = { claude: agentSource, codex: agentSourceToml };
+
 /**
  * `.claude`와 `.codex` 두 표면이 같은 프로젝트에 함께 설치된 픽스처.
  * 스크립트는 각자 자기 표면(`resolve(HERE,'..')`)의 `agents/`에만 쓰지만,
  * `design.md`는 항상 `.claude/_workspace/`라는 공유 앵커에서 읽어야 한다
  * (bin/cli.mjs·inject-design.mjs 상단 설명 참고). 이 픽스처는 그 불변식을 고정한다.
+ * `.codex` 쪽은 실제 배포 형식(TOML)으로 만들어야 표면별 형식 분기(`FORMAT`)가
+ * 실제로 행사된다 — `.md`로 만들면 두 표면이 우연히 같은 코드 경로를 타서
+ * 형식 분기 버그를 놓친다.
  */
 function twoSurfaceFixture(t, { design = GOOD_DESIGN } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'inject-design-test-codex-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
 
   const surfaceDirs = { claude: join(root, '.claude'), codex: join(root, '.codex') };
-  for (const dir of Object.values(surfaceDirs)) {
+  for (const [surface, dir] of Object.entries(surfaceDirs)) {
     mkdirSync(join(dir, 'tools'), { recursive: true });
     mkdirSync(join(dir, 'agents'), { recursive: true });
     copyFileSync(SCRIPT, join(dir, 'tools', 'inject-design.mjs'));
-    for (const name of TARGETS) writeFileSync(join(dir, 'agents', `${name}.md`), agentSource(name));
+    for (const name of TARGETS) {
+      writeFileSync(join(dir, 'agents', `${name}${EXT_BY_SURFACE[surface]}`), SOURCE_BY_SURFACE[surface](name));
+    }
   }
 
   const designPath = join(surfaceDirs.claude, '_workspace', '01_architecture', 'design.md');
@@ -326,7 +340,7 @@ function twoSurfaceFixture(t, { design = GOOD_DESIGN } = {}) {
 
   return {
     scriptOf: (surface) => join(surfaceDirs[surface], 'tools', 'inject-design.mjs'),
-    read: (surface, name) => readFileSync(join(surfaceDirs[surface], 'agents', `${name}.md`), 'utf8'),
+    read: (surface, name) => readFileSync(join(surfaceDirs[surface], 'agents', `${name}${EXT_BY_SURFACE[surface]}`), 'utf8'),
     setDesign: (text) => writeFileSync(designPath, text),
   };
 }
@@ -338,7 +352,17 @@ test('.codex 표면은 자기 agents/에 주입하되 design.md는 .claude/_work
   assert.equal(codexResult.status, 0);
   const codexData = JSON.parse(codexResult.stdout);
   assert.equal(codexData.designReady, true, '.codex도 .claude/_workspace의 design.md를 찾아야 한다');
-  assert.ok(fx.read('codex', 'code-reviewer').includes(BEGIN), '.codex/agents에 주입되어야 한다');
+  const codexAfter = fx.read('codex', 'code-reviewer');
+  assert.ok(codexAfter.includes(BEGIN), '.codex/agents에 주입되어야 한다');
+  assert.equal(
+    codexAfter.split("'''").length - 1,
+    2,
+    "TOML 리터럴 문자열 구분자(''')가 정확히 2개(열기/닫기)여야 한다 — 주입 블록이 문자열을 조기 종료시키면 안 된다",
+  );
+  assert.ok(
+    codexAfter.indexOf("developer_instructions = '''") < codexAfter.indexOf(BEGIN),
+    '주입 블록은 developer_instructions 문자열 안(여는 델리미터 뒤)에 있어야 한다',
+  );
 
   const claudeResult = spawnSync(process.execPath, [fx.scriptOf('claude'), '--json'], { encoding: 'utf8' });
   const claudeData = JSON.parse(claudeResult.stdout);

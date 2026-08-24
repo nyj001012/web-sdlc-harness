@@ -32,7 +32,7 @@
 
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { join, dirname, resolve, relative } from 'node:path';
+import { join, dirname, resolve, relative, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 // ─────────────────────────────────────────────────────────────
@@ -44,6 +44,17 @@ const REPO_ROOT = resolve(SURFACE_DIR, '..');
 // design.md·워크스페이스는 표면과 무관하게 항상 `.claude/_workspace/`에 고정한다.
 const DESIGN_PATH = join(REPO_ROOT, '.claude', '_workspace', '01_architecture', 'design.md');
 const AGENTS_DIR = join(SURFACE_DIR, 'agents');
+
+/**
+ * 표면별 에이전트 정의 형식. Claude Code는 YAML 프론트매터 + Markdown 본문(`.md`)이고,
+ * Codex 커스텀 에이전트는 TOML(`.toml`)이다 — `name`·`description`·`developer_instructions`
+ * (전체 지침을 담는 문자열 필드)가 필수이고, `tools`/`allowed-tools` 같은 도구 화이트리스트
+ * 필드는 아예 없다(권한은 `sandbox_mode`로 통제). 두 형식 모두 원시 텍스트에서 BEGIN/END
+ * 마커를 문자열 검색으로 찾고 잘라 붙이는 동일한 로직을 쓰며, 다른 것은 "처음 주입할 때
+ * 어디에 꽂을지"(프론트매터 직후 vs `developer_instructions` 문자열 시작)뿐이다.
+ */
+const FORMAT = basename(SURFACE_DIR) === '.codex' ? 'toml' : 'md';
+const AGENT_EXT = FORMAT === 'toml' ? '.toml' : '.md';
 
 const BEGIN = '<!-- DESIGN_SPEC:BEGIN -->';
 const END = '<!-- DESIGN_SPEC:END -->';
@@ -227,6 +238,23 @@ function frontmatterEnd(text) {
   return close + '\n---\n'.length;
 }
 
+/**
+ * Codex TOML 에이전트에서 `developer_instructions = '''` 리터럴 멀티라인 문자열의
+ * 시작 오프셋을 찾는다. 이 필드가 통째로 시스템 프롬프트이므로, 그 본문 최상단이
+ * Markdown의 "프론트매터 직후"에 대응한다. 찾지 못하면(형식이 어긋난 파일) 0을
+ * 반환해 파일 맨 앞에 꽂는다 — 조용히 건너뛰는 것보다 눈에 띄게 어긋나는 편이 낫다.
+ */
+function tomlBodyStart(text) {
+  const m = /developer_instructions\s*=\s*'''\r?\n/.exec(text);
+  if (!m) return 0;
+  return m.index + m[0].length;
+}
+
+/** TOML 리터럴 문자열(`'''...'''`)을 조기 종료시키는 `'''` 시퀀스를 무력화한다. */
+function escapeTomlLiteral(text) {
+  return text.replace(/'''/g, "''’'");
+}
+
 // ─────────────────────────────────────────────────────────────
 // 주입 블록 생성
 // ─────────────────────────────────────────────────────────────
@@ -257,6 +285,9 @@ function buildBlock(design) {
   // design.md 본문이 종료 마커를 포함하면 블록 경계가 깨지므로 무력화한다.
   const safe = design.split(END).join('<!-- DESIGN_SPEC:END(escaped) -->');
   const fp = fingerprintOf(safe);
+  // 지문은 표면과 무관하게 항상 이 `safe` 텍스트로만 계산한다 — TOML 표면용 추가
+  // 이스케이프(아래)가 지문에 섞이면 같은 design.md인데도 표면마다 지문이 갈라진다.
+  const embedded = FORMAT === 'toml' ? escapeTomlLiteral(safe) : safe;
 
   return [
     ...header,
@@ -275,7 +306,7 @@ function buildBlock(design) {
     '4. 최종 보고 첫 줄에 `DESIGN_FINGERPRINT: ' + fp + '` 를 그대로 포함한다. 오케스트레이터가 주입 최신성을 대조하는 데 쓴다.',
     '',
     `<design_spec fingerprint="${fp}">`,
-    safe.trimEnd(),
+    embedded.trimEnd(),
     '</design_spec>',
     '',
     END,
@@ -286,7 +317,7 @@ function buildBlock(design) {
 // 파일 단위 처리
 // ─────────────────────────────────────────────────────────────
 function applyToAgent(agentName, block) {
-  const path = join(AGENTS_DIR, `${agentName}.md`);
+  const path = join(AGENTS_DIR, `${agentName}${AGENT_EXT}`);
   if (!existsSync(path)) return { agent: agentName, status: 'missing', path: rel(path) };
 
   const raw = readFileSync(path, 'utf8');
@@ -307,8 +338,9 @@ function applyToAgent(agentName, block) {
     // 기존 블록을 같은 자리에서 교체한다 (멱등).
     next = original.slice(0, beginIdx) + block + original.slice(endIdx + END.length);
   } else {
-    // 최초 주입: 프론트매터 직후 = 시스템 프롬프트 최상단.
-    const at = frontmatterEnd(original);
+    // 최초 주입: 시스템 프롬프트 최상단 = Markdown이면 프론트매터 직후,
+    // TOML이면 `developer_instructions` 리터럴 문자열의 본문 시작.
+    const at = FORMAT === 'toml' ? tomlBodyStart(original) : frontmatterEnd(original);
     const head = original.slice(0, at);
     const tail = original.slice(at).replace(/^\n+/, '');
     next = `${head}\n${block}\n\n${tail}`;
