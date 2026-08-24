@@ -29,7 +29,7 @@
     ".claude/skills/**",
     ".claude/tools/**",
     ".codex/agents/**",
-    ".codex/skills/**",
+    ".agents/skills/**",
     "bin/**"
   ],
   "engines": {

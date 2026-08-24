@@ -37,7 +37,9 @@ web-sdlc-harness --target ./my-project   # 이후 npx 없이 바로 실행
 
 ### Codex 지원 범위
 
-`.codex/`는 `.claude/`와 라우팅·페이즈 골격이 같지만, Codex의 서브에이전트가 오케스트레이터에게만 결과를 보고하는 허브-스포크 구조라 P2P 팀 모드에 대응하는 기능이 없다. 그래서 Claude Code 표면이 Phase 3 Track A에서 쓰는 QA↔Developer↔Reviewer↔DB 팀 핑퐁을, Codex 표면은 **서브 에이전트 순차 위임**으로 대체한다 — 결과는 같지만 데이터 레인의 조기 언블록(스키마 확정 즉시 BE 착수) 같은 P2P 전용 최적화는 포기한다. 정확한 차이는 `.codex/skills/run_web_sdlc/SKILL.md`의 Rule 1·Phase 3에 문서화돼 있다. 두 표면을 함께 설치해도 `design.md`는 하나(`.claude/_workspace/`)를 공유한다.
+Codex 커스텀 에이전트는 Claude Code처럼 Markdown+YAML 프론트매터가 아니라 **TOML**이다(`.codex/agents/<name>.toml`). `name`·`description`·`developer_instructions`(전체 지침을 담는 문자열)가 필수이고, `model_reasoning_effort`(`ultra`/`max`/`xhigh`/`high`/`medium`/`low`)와 `sandbox_mode`(`read-only`/`workspace-write`)를 선택으로 갖는다 — Claude의 `tools:` 같은 도구 화이트리스트 필드는 없다. 이 하네스는 Claude의 모델 등급을 그대로 대응시킨다: `opus`→`high`, `sonnet`→`medium`, `haiku`→`low`, 그리고 실제로 쓰지 않는 `code-reviewer`만 `read-only`이고 나머지는 `workspace-write`다. 스킬(SKILL.md)은 `.codex/` 밑이 아니라 저장소 루트 기준 **`.agents/skills/`**에서 Codex가 자동 탐색한다(공식 문서 확인) — `.codex/skills/`가 아니다.
+
+라우팅·페이즈 골격은 `.claude/`와 같지만, Codex의 서브에이전트가 오케스트레이터에게만 결과를 보고하는 허브-스포크 구조라 P2P 팀 모드에 대응하는 기능이 없다. 그래서 Claude Code 표면이 Phase 3 Track A에서 쓰는 QA↔Developer↔Reviewer↔DB 팀 핑퐁을, Codex 표면은 **서브 에이전트 순차 위임**으로 대체한다 — 결과는 같지만 데이터 레인의 조기 언블록(스키마 확정 즉시 BE 착수) 같은 P2P 전용 최적화는 포기한다. 정확한 차이는 `.agents/skills/run_web_sdlc/SKILL.md`의 Rule 1·Phase 3에 문서화돼 있다. 두 표면을 함께 설치해도 `design.md`는 하나(`.claude/_workspace/`)를 공유한다.
 
 ### 전제: Node.js가 필요하다
 
@@ -52,7 +54,8 @@ Claude Code·Codex CLI를 **네이티브 인스톨러로 설치한 환경에는 
 ```bash
 git clone --depth 1 https://github.com/nyj001012/web-sdlc-harness.git /tmp/harness
 cp -r /tmp/harness/.claude/{agents,skills,tools} <대상>/.claude/   # Claude Code 표면
-cp -r /tmp/harness/.codex/{agents,skills,tools} <대상>/.codex/     # Codex 표면 (필요한 쪽만)
+cp -r /tmp/harness/.codex/{agents,tools} <대상>/.codex/            # Codex 표면 (에이전트·주입기)
+cp -r /tmp/harness/.agents/skills <대상>/.agents/                  # Codex 스킬 (자동 탐색 경로가 다르다)
 ```
 
 이 경우 `.gitignore` 병합과 충돌 검사는 직접 해야 한다. 「산출물 구조」의 미추적 세 경로를 참고하라.
@@ -281,8 +284,9 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 └── bin/cli.mjs                    # npx 스캐폴더 (init / update / --preflight / --claude / --codex)
 
 (설치되는 두 표면 — 설치 옵션에 따라 한쪽 또는 둘 다)
-.claude/{agents,skills,tools}/     # Claude Code용. Track A에 P2P 팀 모드 사용
-.codex/{agents,skills,tools}/      # Codex CLI용. 항상 허브-스포크(순차 위임) 사용
+.claude/{agents,skills,tools}/     # Claude Code용(Markdown+YAML). Track A에 P2P 팀 모드 사용
+.codex/{agents,tools}/             # Codex CLI용. agents는 TOML(`<name>.toml`), 항상 허브-스포크(순차 위임) 사용
+.agents/skills/                    # Codex 스킬(SKILL.md). Codex가 이 경로를 자동 탐색한다 — `.codex/skills/`가 아니다
 
 tools/ 안 내용은 두 표면 모두 동일한 원본 하나에서 복사된다:
 ├── inject-design.mjs              # design.md ➔ 에이전트 시스템 프롬프트 정적 주입기
@@ -320,7 +324,7 @@ tools/ 안 내용은 두 표면 모두 동일한 원본 하나에서 복사된�
 - **역할을 늘리기보다 인스턴스를 복제한다** — 주입 방식 때문에 새 agent type은 캐시 접두사를 하나 더 만들고, 파이프라인당 1회 스폰이면 그 미스를 회수할 기회가 없다. 병렬화가 필요하면 파일 트리가 겹치지 않는 축으로 같은 타입을 복제한다.
 - **판정 한 필드가 조직도를 대체한다** — 실패를 어느 역할에 넘길지는 리더 계층이 있어야 정해지는 것이 아니다. `e2e-tester`의 `area` 한 필드로 재스폰 대상이 결정되므로, 계층을 늘리지 않고 핀포인트 라우팅이 성립한다.
 - **P2P 통신은 Claude Code 표면의 Track A 한정** — Claude Code에서는 팀 모드를 Phase 3 Track A(QA ↔ Developer ↔ Reviewer)에만 쓴다. 그 구간의 팀원은 리더를 거치지 않고 서로 직접 `SendMessage`로 피드백 루프를 돈다. 그 밖의 역할은 모두 서브 에이전트이며 **발신 대상이 없다** — 다른 역할에 전달할 내용은 최종 보고에 담고 오케스트레이터가 중계한다. 브로드캐스트(`to: "all"`)는 쓰지 않는다.
-- **Codex 표면은 항상 허브-스포크** — Codex 서브에이전트에는 팀원 간 상시 채널이 없으므로, `.codex/skills/run_web_sdlc/SKILL.md`는 Track A도 Track B와 같은 방식(순차 위임 + 오케스트레이터 중계)으로 진행한다. 두 표면의 라우팅·페이즈 골격은 같지만 이 지점만 다르다.
+- **Codex 표면은 항상 허브-스포크** — Codex 서브에이전트에는 팀원 간 상시 채널이 없으므로, `.agents/skills/run_web_sdlc/SKILL.md`는 Track A도 Track B와 같은 방식(순차 위임 + 오케스트레이터 중계)으로 진행한다. 두 표면의 라우팅·페이즈 골격은 같지만 이 지점만 다르다.
 - **메인 브랜치 보호** — `issue-pm`이 이슈 번호 기반 `<타입>/<이슈번호>-<슬러그>` 브랜치를 먼저 따고, 그 위에서만 개발이 진행된다.
 
 ## 라이선스
