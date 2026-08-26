@@ -222,7 +222,8 @@ graph TD
     %% 수렴 및 리뷰 루프
     fe_dev --> CR[code-reviewer <br> 📥 팬인 ① 수렴]
     be_dev --> CR
-    CR -.->|반려 시 순환<br>최대 3회| CR
+    CR -.->|반려 시 순환<br>최대 3회| fe_dev
+    CR -.->|반려 시 순환<br>최대 3회| be_dev
 
     %% 최종 합류 (Phase 4)
     CR --> P4[⚡ Phase 4: E2E 통합 테스트 <br> 🔄 팬인 ② 동기화 지점]
