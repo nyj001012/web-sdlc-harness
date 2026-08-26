@@ -25,7 +25,7 @@ description: 기획서 또는 호출자가 확정한 범위를 바탕으로 GitH
    - `git branch --show-current`를 실행하여 현재 브랜치가 기본 브랜치(`main`)가 아닌 새 작업 브랜치로 정확히 이동되었는지 확인한다.
 
 4. **산출물 적재 (Save Report)**
-   - 생성된 이슈 목록과 현재 체크아웃된 브랜치명을 `.claude/_workspace/02_issues/issue_report.md`에 저장하고 종료한다.
+   - 생성된 이슈 목록과 현재 체크아웃된 브랜치명을 `.codex/_workspace/02_issues/issue_report.md`에 저장하고 종료한다.
 
 ## Why (왜 이렇게 하는가?)
 - **메인 브랜치 오염 방지:** 이슈 PM이 사전에 브랜치를 따두지 않으면, 하위 에이전트들(FE/BE)이 `main` 브랜치에서 코드를 수정하는 대참사가 발생하기 때문이다. 격리된 환경(Clean Room)을 제공하는 것이 PM의 의무다.

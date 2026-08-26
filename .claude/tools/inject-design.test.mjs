@@ -300,58 +300,63 @@ test('대상 에이전트 정의가 없으면 missing으로 보고하고 exit 1�
   assert.ok(fx.read('code-reviewer').includes(BEGIN), '나머지 대상은 정상 주입되어야 한다');
 });
 
-// ── 두 표면(.claude/.codex) 공존 (Codex 지원) ────────────────────
+// ── 두 호스트(.claude/.codex) 공존 (Codex 지원) ────────────────────
 
-/** Codex 표면 픽스처용 최소 TOML 에이전트. `developer_instructions` 리터럴 문자열을 갖춘다. */
+/** Codex 호스트 픽스처용 최소 TOML 에이전트. `developer_instructions` 리터럴 문자열을 갖춘다. */
 const agentSourceToml = (name) =>
   [`name = "${name}"`, 'description = "픽스처"', '', "developer_instructions = '''", `# ${name}`, '', '본문 한 줄.', "'''", ''].join(
     LF,
   );
 
-const EXT_BY_SURFACE = { claude: '.md', codex: '.toml' };
-const SOURCE_BY_SURFACE = { claude: agentSource, codex: agentSourceToml };
+const EXT_BY_HOST = { claude: '.md', codex: '.toml' };
+const SOURCE_BY_HOST = { claude: agentSource, codex: agentSourceToml };
 
 /**
- * `.claude`와 `.codex` 두 표면이 같은 프로젝트에 함께 설치된 픽스처.
- * 스크립트는 각자 자기 표면(`resolve(HERE,'..')`)의 `agents/`에만 쓰지만,
- * `design.md`는 항상 `.claude/_workspace/`라는 공유 앵커에서 읽어야 한다
- * (bin/cli.mjs·inject-design.mjs 상단 설명 참고). 이 픽스처는 그 불변식을 고정한다.
- * `.codex` 쪽은 실제 배포 형식(TOML)으로 만들어야 표면별 형식 분기(`FORMAT`)가
- * 실제로 행사된다 — `.md`로 만들면 두 표면이 우연히 같은 코드 경로를 타서
+ * `.claude`와 `.codex` 두 호스트가 같은 프로젝트에 함께 설치된 픽스처.
+ * 스크립트는 각자 자기 호스트(`resolve(HERE,'..')`)의 `agents/`에 주입하고,
+ * `design.md`도 같은 호스트 밑 `_workspace/`에서 읽는다 — 워크스페이스는 호스트마다
+ * 독립이다 (bin/cli.mjs·inject-design.mjs 상단 설명 참고). 이 픽스처는 두 호스트에
+ * 서로 다른 design.md를 심어 그 격리를 고정한다.
+ * `.codex` 쪽은 실제 배포 형식(TOML)으로 만들어야 호스트별 형식 분기(`FORMAT`)가
+ * 실제로 행사된다 — `.md`로 만들면 두 호스트가 우연히 같은 코드 경로를 타서
  * 형식 분기 버그를 놓친다.
  */
-function twoSurfaceFixture(t, { design = GOOD_DESIGN } = {}) {
+function twoHostFixture(t, { claudeDesign = GOOD_DESIGN, codexDesign = GOOD_DESIGN } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'inject-design-test-codex-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
 
-  const surfaceDirs = { claude: join(root, '.claude'), codex: join(root, '.codex') };
-  for (const [surface, dir] of Object.entries(surfaceDirs)) {
+  const hostDirs = { claude: join(root, '.claude'), codex: join(root, '.codex') };
+  const designOf = { claude: claudeDesign, codex: codexDesign };
+  const designPathOf = {};
+  for (const [host, dir] of Object.entries(hostDirs)) {
     mkdirSync(join(dir, 'tools'), { recursive: true });
     mkdirSync(join(dir, 'agents'), { recursive: true });
     copyFileSync(SCRIPT, join(dir, 'tools', 'inject-design.mjs'));
     for (const name of TARGETS) {
-      writeFileSync(join(dir, 'agents', `${name}${EXT_BY_SURFACE[surface]}`), SOURCE_BY_SURFACE[surface](name));
+      writeFileSync(join(dir, 'agents', `${name}${EXT_BY_HOST[host]}`), SOURCE_BY_HOST[host](name));
+    }
+    const designPath = join(dir, '_workspace', '01_architecture', 'design.md');
+    designPathOf[host] = designPath;
+    if (designOf[host] !== null) {
+      mkdirSync(dirname(designPath), { recursive: true });
+      writeFileSync(designPath, designOf[host]);
     }
   }
 
-  const designPath = join(surfaceDirs.claude, '_workspace', '01_architecture', 'design.md');
-  mkdirSync(dirname(designPath), { recursive: true });
-  writeFileSync(designPath, design);
-
   return {
-    scriptOf: (surface) => join(surfaceDirs[surface], 'tools', 'inject-design.mjs'),
-    read: (surface, name) => readFileSync(join(surfaceDirs[surface], 'agents', `${name}${EXT_BY_SURFACE[surface]}`), 'utf8'),
-    setDesign: (text) => writeFileSync(designPath, text),
+    scriptOf: (host) => join(hostDirs[host], 'tools', 'inject-design.mjs'),
+    read: (host, name) => readFileSync(join(hostDirs[host], 'agents', `${name}${EXT_BY_HOST[host]}`), 'utf8'),
+    setDesign: (host, text) => writeFileSync(designPathOf[host], text),
   };
 }
 
-test('.codex 표면은 자기 agents/에 주입하되 design.md는 .claude/_workspace의 공유 원본을 읽는다', (t) => {
-  const fx = twoSurfaceFixture(t);
+test('.codex 호스트는 자기 agents/에 주입하며 design.md도 자기 호스트(.codex/_workspace)에서 읽는다', (t) => {
+  const fx = twoHostFixture(t);
 
   const codexResult = spawnSync(process.execPath, [fx.scriptOf('codex'), '--json'], { encoding: 'utf8' });
   assert.equal(codexResult.status, 0);
   const codexData = JSON.parse(codexResult.stdout);
-  assert.equal(codexData.designReady, true, '.codex도 .claude/_workspace의 design.md를 찾아야 한다');
+  assert.equal(codexData.designReady, true, '.codex도 .codex/_workspace의 design.md를 찾아야 한다');
   const codexAfter = fx.read('codex', 'code-reviewer');
   assert.ok(codexAfter.includes(BEGIN), '.codex/agents에 주입되어야 한다');
   assert.equal(
@@ -366,16 +371,24 @@ test('.codex 표면은 자기 agents/에 주입하되 design.md는 .claude/_work
 
   const claudeResult = spawnSync(process.execPath, [fx.scriptOf('claude'), '--json'], { encoding: 'utf8' });
   const claudeData = JSON.parse(claudeResult.stdout);
-  assert.equal(claudeData.fingerprint, codexData.fingerprint, '두 표면은 같은 design.md를 공유하므로 지문이 같아야 한다');
+  assert.equal(claudeData.fingerprint, codexData.fingerprint, '같은 내용의 design.md를 각자 넣었으므로 지문은 같다');
 });
 
-test('공유 design.md가 바뀌면 두 표면 모두 --check에서 드리프트를 감지한다', (t) => {
-  const fx = twoSurfaceFixture(t);
+test('한쪽 호스트의 design.md만 바뀌면 그 호스트만 드리프트를 감지하고 다른 호스트는 영향받지 않는다', (t) => {
+  const fx = twoHostFixture(t);
   assert.equal(spawnSync(process.execPath, [fx.scriptOf('claude')]).status, 0);
   assert.equal(spawnSync(process.execPath, [fx.scriptOf('codex')]).status, 0);
 
-  fx.setDesign(GOOD_DESIGN.replace('픽스처 전용 가상 스택', '공유 원본 변경'));
+  fx.setDesign('claude', GOOD_DESIGN.replace('픽스처 전용 가상 스택', '.claude만 변경'));
 
-  assert.equal(spawnSync(process.execPath, [fx.scriptOf('claude'), '--check']).status, 1);
-  assert.equal(spawnSync(process.execPath, [fx.scriptOf('codex'), '--check']).status, 1);
+  assert.equal(spawnSync(process.execPath, [fx.scriptOf('claude'), '--check']).status, 1, '.claude는 드리프트를 감지해야 한다');
+  assert.equal(spawnSync(process.execPath, [fx.scriptOf('codex'), '--check']).status, 0, '.codex는 자기 워크스페이스가 안 바뀌었으므로 영향 없어야 한다');
+});
+
+test('.codex 호스트는 design.md가 없으면 .claude 쪽에 있어도 NOT READY로 처리한다 (호스트 간 공유 없음)', (t) => {
+  const fx = twoHostFixture(t, { codexDesign: null });
+
+  const codexResult = spawnSync(process.execPath, [fx.scriptOf('codex'), '--json'], { encoding: 'utf8' });
+  const codexData = JSON.parse(codexResult.stdout);
+  assert.equal(codexData.designReady, false, '.claude/_workspace에 design.md가 있어도 .codex는 자기 워크스페이스만 본다');
 });

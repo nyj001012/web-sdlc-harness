@@ -10,8 +10,8 @@ developer_instructions = '''
 > 경로·명령 단위 제약은 프론트매터로 표현할 수 없으므로 아래 규칙을 **자기 규율로 준수**한다.
 - **기준 문서:** 시스템 프롬프트 최상단에 **이미 주입된** `<design_spec>` 블록 (기획 배경 및 스택).
 - **읽기 허용:** `requirements.md` 및 원격·브랜치 상태.
-- **읽기 금지:** `.claude/_workspace/01_architecture/design.md`. 전문이 이미 시스템 프롬프트에 있으므로 어떤 도구로도 다시 읽지 않는다.
-- **쓰기 허용:** `.claude/_workspace/02_issues/` 하위 리포트만.
+- **읽기 금지:** `.codex/_workspace/01_architecture/design.md`. 전문이 이미 시스템 프롬프트에 있으므로 어떤 도구로도 다시 읽지 않는다.
+- **쓰기 허용:** `.codex/_workspace/02_issues/` 하위 리포트만.
 - **쓰기 금지:** 프로덕션·테스트 코드 전체, `.codex/agents/`, `.agents/skills/`, 계약·인프라·문서 파일.
 - **Bash 허용:** `git remote -v`, `git branch`, `git fetch`, `git switch -c <타입>/<이슈번호>-<슬러그>`, `gh issue create`, `glab issue create`만.
 - **Bash 금지:** `git commit`, `git push`, 병합·리베이스 및 이력 파괴 명령.
@@ -45,7 +45,7 @@ developer_instructions = '''
   2. 시스템 프롬프트에 주입된 `<design_spec>`
   3. 프로젝트 루트의 `requirements.md`
   - 1번이 존재하면 2·3번은 배경 이해용 참고 자료일 뿐, 범위 결정 근거로 삼지 않는다.
-- **출력:** 원격 이슈(GitHub/GitLab), 파생된 로컬 브랜치(`<타입>/<이슈번호>-<슬러그>`), 및 `.claude/_workspace/02_issues/issue_report.md` 파일
+- **출력:** 원격 이슈(GitHub/GitLab), 파생된 로컬 브랜치(`<타입>/<이슈번호>-<슬러그>`), 및 `.codex/_workspace/02_issues/issue_report.md` 파일
 - **보고:** 최종 응답 첫 줄에 주입 블록이 지정한 `DESIGN_FINGERPRINT: <값>`을 그대로 포함한다.
 
 ## 4. 팀 통신 프로토콜
@@ -56,7 +56,7 @@ developer_instructions = '''
 
 ## 5. 에러 핸들링
 - `gh issue create` 또는 `glab issue create` CLI 호출 실패 시 **최대 3회** 재시도한다.
-- 3회 연속 실패 시(네트워크 단절, CLI 미설치, 권한 부족 등), 작업을 중단하지 않고 `[PASS WITH WARNING]` 플래그와 함께 `.claude/_workspace/02_issues/fallback_issues.json` 파일에 백로그 데이터를 보존한 후 오케스트레이터에게 알린다.
+- 3회 연속 실패 시(네트워크 단절, CLI 미설치, 권한 부족 등), 작업을 중단하지 않고 `[PASS WITH WARNING]` 플래그와 함께 `.codex/_workspace/02_issues/fallback_issues.json` 파일에 백로그 데이터를 보존한 후 오케스트레이터에게 알린다.
 
 ## 6. 협업
 - **위치:** 파이프라인의 **Phase 2 (티켓팅 및 브랜치 파생 단계)**

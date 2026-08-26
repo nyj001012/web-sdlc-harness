@@ -7,7 +7,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 
 이 스킬은 13개의 에이전트 페르소나를 페이즈(Phase)별로 동적 라우팅하여 서브 에이전트로 위임하고, 오케스트레이터가 결과를 중계해 작업을 조율하는 마스터 지휘소다.
 
-> ⚠️ **Codex 표면 전용 문서.** 이 파일은 `.agents/skills/run_web_sdlc/`에 설치된다(Codex가 스킬을 탐색하는 경로는 `.codex/`가 아니라 저장소 루트 기준 `.agents/skills/`다). 에이전트 정의는 `.codex/agents/*.toml`에 있다 — Codex의 커스텀 에이전트는 Claude Code의 Markdown+YAML 프론트매터가 아니라 TOML 파일이며, `name`·`description`·`developer_instructions`(전체 지침 문자열)를 필수로, `model_reasoning_effort`·`sandbox_mode`를 선택으로 갖는다. Claude Code 표면(`.claude/skills/run_web_sdlc/`)에는 P2P 팀 모드를 쓰는 별도 버전이 있다 — Codex의 서브에이전트는 오케스트레이터에게만 결과를 보고하는 허브-스포크 방식이라 팀원 간 상시 채널에 대응하는 기능이 없기 때문이다. 두 문서는 라우팅·페이즈 골격은 같지만 Rule 1과 Phase 3의 실행 방식이 다르다.
+> ⚠️ **Codex 호스트 전용 문서.** 이 파일은 `.agents/skills/run_web_sdlc/`에 설치된다(Codex가 스킬을 탐색하는 경로는 `.codex/`가 아니라 저장소 루트 기준 `.agents/skills/`다). 에이전트 정의는 `.codex/agents/*.toml`에 있다 — Codex의 커스텀 에이전트는 Claude Code의 Markdown+YAML 프론트매터가 아니라 TOML 파일이며, `name`·`description`·`developer_instructions`(전체 지침 문자열)를 필수로, `model_reasoning_effort`·`sandbox_mode`를 선택으로 갖는다. Claude Code 호스트(`.claude/skills/run_web_sdlc/`)에는 P2P 팀 모드를 쓰는 별도 버전이 있다 — Codex의 서브에이전트는 오케스트레이터에게만 결과를 보고하는 허브-스포크 방식이라 팀원 간 상시 채널에 대응하는 기능이 없기 때문이다. 두 문서는 라우팅·페이즈 골격은 같지만 Rule 1과 Phase 3의 실행 방식이 다르다.
 
 ## 📌 Orchestration Rules (절대 준수 규칙)
 
@@ -21,21 +21,21 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
    - Codex에는 공유 Task 보드 도구가 없다. 각 페이즈가 시작될 때 오케스트레이터는 이번 페이즈에서 수행할 작업을 스스로 목록화해 두고(대화 맥락 또는 필요시 워크스페이스의 메모 파일), 서브 에이전트를 위임할 때 그 항목을 스폰 프롬프트에 명시적으로 담는다. 구두로만 지시하고 넘어가지 않는다.
 3. **마이크로 커밋 (Micro-commits)**
    - 각 Phase나 개발 트랙 종료 시, 위임했던 서브 에이전트는 최종 보고와 함께 이미 종료돼 있으므로 별도의 종료 시퀀스가 필요 없다.
-   - **Rule 6의 페이즈 인계 파일(`.claude/_workspace/handoff/phase-<N>.md`)을 먼저 기록한다.** 다음 페이즈가 필요한 사실을 파일에 먼저 남긴 뒤 커밋해야, 컨텍스트가 요약되거나 세션이 끊겨도 인계가 끊기지 않는다.
+   - **Rule 6의 페이즈 인계 파일(`.codex/_workspace/handoff/phase-<N>.md`)을 먼저 기록한다.** 다음 페이즈가 필요한 사실을 파일에 먼저 남긴 뒤 커밋해야, 컨텍스트가 요약되거나 세션이 끊겨도 인계가 끊기지 않는다.
    - **그 뒤에, 오케스트레이터가 직접 `Bash` 도구를 사용하여 해당 Phase의 변경만 스테이징하고 `git commit -m "feat(Phase N): [작업명] 완료"` 형식으로 스냅샷을 저장한다.**
    - ⛔ **스테이징 전 주입 블록 잔존 확인:** `git status --porcelain`으로 이번 페이즈의 작업 대상이 아닌 `.codex/agents/*.toml`이 수정 목록에 올라와 있는지 확인한다. 주입 블록만 다른 변경이라면 `node .codex/tools/inject-design.mjs --clear`로 복원한 뒤 스테이징한다. `git add -A`나 `git add .codex/`처럼 범위를 넓히는 스테이징을 하지 마라.
    - 📌 **주입 결과를 의도적으로 커밋하는 곳은 Phase 1 한 곳뿐이다.** 하네스 메타 라우트에는 Phase 1이 없고 주입 자체를 실행하지 않으므로, 그 라우트에서 `.codex/agents/*.toml`의 주입 블록이 커밋되는 경우는 존재하지 않는다.
 4. **감사 로그 기록 (Audit Logging)**
-   - 각 페이즈가 시작하고 종료될 때마다 `.claude/_workspace/log/orchestrator-log.jsonl` 파일에 Append-only 방식으로 로그를 남긴다.
+   - 각 페이즈가 시작하고 종료될 때마다 `.codex/_workspace/log/orchestrator-log.jsonl` 파일에 Append-only 방식으로 로그를 남긴다.
    - 포맷: `{"timestamp": "ISO8601", "phase": "Phase N", "status": "START|END", "task_batch": ["task1", "task2"]}`
 5. **기술 스택 SSOT 강제 (Stack Binding) — 정적 주입 방식**
-   - 이 하네스는 **어떤 기술 스택도 전제하지 않는다.** 스택·경로 소유권·표준 명령어·계약 형식·아키텍처 규약은 오직 `.claude/_workspace/01_architecture/design.md`가 정의한다.
+   - 이 하네스는 **어떤 기술 스택도 전제하지 않는다.** 스택·경로 소유권·표준 명령어·계약 형식·아키텍처 규약은 오직 `.codex/_workspace/01_architecture/design.md`가 정의한다.
    - ⛔ **에이전트에게 `design.md`를 도구로 읽으라고 지시하지 마라.** 스폰 프롬프트에 "착수 전 설계서를 읽어라", "`Read`로 design.md를 확인하라" 같은 문구를 넣는 것을 금지한다. 대신 아래 주입 절차를 따른다.
    - 🔧 **주입 절차 (하네스 단 정적 주입):** 에이전트를 스폰하기 **전에** 오케스트레이터가 직접 `Bash`로 실행한다.
      ```bash
      node .codex/tools/inject-design.mjs
      ```
-     이 스크립트는 `fs.readFileSync`로 `design.md`(`.claude/_workspace/`에 있는 공유 원본 — Claude Code 표면과 같은 파일을 읽는다) 전문을 읽어 각 대상 에이전트 정의 파일(`.codex/agents/<name>.toml`)의 **`developer_instructions` 문자열 필드 본문 최상단**에 `<!-- DESIGN_SPEC:BEGIN --> … <!-- DESIGN_SPEC:END -->` 블록으로 보간한다(Claude 표면의 "프론트매터 직후"에 대응하는 위치). 멱등이므로 몇 번을 실행해도 안전하다.
+     이 스크립트는 `fs.readFileSync`로 `design.md`(`.codex/_workspace/`에 있는, 이 호스트 전용 원본 — Claude Code 호스트의 `.claude/_workspace/design.md`와는 별개다) 전문을 읽어 각 대상 에이전트 정의 파일(`.codex/agents/<name>.toml`)의 **`developer_instructions` 문자열 필드 본문 최상단**에 `<!-- DESIGN_SPEC:BEGIN --> … <!-- DESIGN_SPEC:END -->` 블록으로 보간한다(Claude 호스트의 "프론트매터 직후"에 대응하는 위치). 멱등이므로 몇 번을 실행해도 안전하다.
    - 📌 **주입이 캐싱에 유리한 이유:** 에이전트 정의 본문은 그대로 서브 에이전트의 시스템 프롬프트가 되며, 이는 대화의 **불변 접두사**다. 같은 에이전트 타입을 여러 번 스폰해도 이 영역은 캐시 히트한다. 반면 `Read` 호출은 에이전트마다 왕복을 1회씩 추가로 소모하고, 설계 전문이 접두사가 아닌 대화 중간에 실려 재사용되지 않는다.
    - 🕐 **재주입 시점 (필수):**
      - Phase 0 진입 직후 (1회). **단 하네스 메타 라우트는 예외이며 주입을 아예 실행하지 않는다** (Phase 0의 라우트 판별 참조).
@@ -48,7 +48,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
    - 🚫 `system-architect`와 `release-manager`는 주입 대상이 아니다. 전자는 `design.md`의 **생산자**이므로 낡은 사본을 주입받으면 안 되고(이 역할만 `design.md`를 직접 읽고 쓴다), 후자는 스택 의존성이 없다.
 6. **페이즈 인계 계약 (Phase Handoff Contract)**
    - 오케스트레이터 컨텍스트는 길어지면 요약(auto-compact)되거나 세션 재시작으로 사라진다. 페이즈 경계에서 다음 페이즈가 필요한 사실을 **파일로 남겨** 컨텍스트를 잃어도 인계가 끊기지 않게 한다. 컨텍스트를 잘라내는 것이 아니라 **잃어도 무해한 구조**를 만드는 것이 목적이다.
-   - **경로:** `.claude/_workspace/handoff/phase-<N>.md` (N은 페이즈 번호. 같은 페이즈를 재실행하면 덮어쓴다.)
+   - **경로:** `.codex/_workspace/handoff/phase-<N>.md` (N은 페이즈 번호. 같은 페이즈를 재실행하면 덮어쓴다.)
    - **Fast 트랙은 `phase-3.md` 한 개만 쓴다.** 생략한 페이즈의 인계 파일은 만들지 않는다. 파일 수가 곧 재개 비용이므로, 도지 않은 페이즈의 빈 인계 파일은 재개 시 읽을 것을 늘리기만 한다.
    - **작성 시점:** 각 페이즈에서 위임했던 서브 에이전트의 최종 보고를 모두 받은 **직후, 마이크로 커밋 직전** (Rule 3).
    - **필수 필드 9개:** `phase` / `status` / `design_fingerprint` / `branch` / `issue` / `commit` / `artifacts` / `open_items` / `next`
@@ -65,7 +65,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
      issue: "#12 https://github.com/<org>/<repo>/issues/12"
      commit: a1b2c3d      # 마이크로 커밋 직후 채운다
      artifacts:
-       - .claude/_workspace/03_contracts/auth.contract.ts
+       - .codex/_workspace/03_contracts/auth.contract.ts
        - src/api/auth/
      open_items:
        - "code-reviewer 반려 1건: 토큰 만료 경계 테스트 누락 → Phase 4에서 재검증 필요"
@@ -84,8 +84,8 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 ## 🚀 Workflow (작업 순서)
 
 ### Phase 0: 컨텍스트 분석 및 동적 라우팅
-- 사용자 요청과 `.claude/_workspace/`의 기존 산출물을 분석하여 필요한 페이즈만 선택한다.
-- ⭐️ **재개 감지 (Resume Detection):** `.claude/_workspace/handoff/`에 인계 파일이 있으면 **가장 높은 번호 1개만** 읽어 그 지점부터 이어간다 (Rule 6).
+- 사용자 요청과 `.codex/_workspace/`의 기존 산출물을 분석하여 필요한 페이즈만 선택한다.
+- ⭐️ **재개 감지 (Resume Detection):** `.codex/_workspace/handoff/`에 인계 파일이 있으면 **가장 높은 번호 1개만** 읽어 그 지점부터 이어간다 (Rule 6).
   - ⛔ 이전 페이즈들의 인계 파일을 전부 읽거나 `orchestrator-log.jsonl` 전문을 다시 읽지 않는다. **최신 1개로 충분하며**, 여러 개를 읽으면 인계 파일을 둔 절약 효과가 사라진다.
   - 인계 파일의 `status`가 `PAUSED`나 `FAILED`면 그 `open_items`를 먼저 해소한 뒤 다음 페이즈로 진입한다.
 - ⭐️ **라우트 판별 (주입보다 먼저 수행):** 어떤 선행 명령을 실행할지가 라우트에 따라 갈리므로, 주입·검사에 앞서 라우트를 먼저 확정한다. 아래 페이즈 집합은 **Heavy 기준**이며, Fast 트랙은 다음 항목의 난이도 판별이 다시 줄인다.
@@ -104,7 +104,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
       | 문맥 | 하네스 자산의 범위 |
       |---|---|
       | 하네스 저장소 (1단계 통과) | `.claude/`·`.codex/`·`.agents/skills/` 하위(`agents/`·`skills/`·`tools/`·설정 파일) **+** 루트의 배포·문서 자산(`package.json`·`bin/`·`LICENSE`·`README.md`·`.gitignore`·`.gitattributes`) |
-      | 대상 프로젝트 (1단계 불통과) | **`.codex/`·`.agents/skills/` 하위만.** `.claude/`가 함께 설치돼 있어도 이 표면 밖이며, 루트 파일은 애플리케이션 자산이다 |
+      | 대상 프로젝트 (1단계 불통과) | **`.codex/`·`.agents/skills/` 하위만.** `.claude/`가 함께 설치돼 있어도 이 호스트 밖이며, 루트 파일은 애플리케이션 자산이다 |
 
     - ⛔ **대상 프로젝트의 `package.json`·`README.md`를 하네스 자산으로 오인하지 마라.** 같은 파일명이 문맥에 따라 성격이 다르다 — 하네스 저장소에서는 배포 자산이지만, 대상 프로젝트에서는 애플리케이션 매니페스트와 애플리케이션 문서다. 대상 프로젝트에서 의존성을 추가하는 작업을 하네스 메타로 분류하면 **주입이 생략되고 Track A 구현 에이전트도 스폰되지 않아**, 정상적인 개발이 설계 명세 없이 구현 역할 없이 진행된다.
     - 두 영역이 섞인 작업은 하네스 메타가 아니므로 아래 주입 절차를 정상 수행한다.
@@ -117,7 +117,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
   - **적용 대상 라우트:** 전체 구축·FE 단독·BE 단독·인프라 단독. **문서 단독과 하네스 메타는 대상이 아니다** — 두 라우트는 이미 페이즈 집합이 고정돼 있다.
   - **Fast 판정 조건 (아래가 전부 참일 때만):**
     1. 수정할 타겟 파일이 **확정돼 있고 소수**다 (대략 3개 이하).
-    2. `.claude/_workspace/03_contracts/`의 계약을 바꾸지 않는다.
+    2. `.codex/_workspace/03_contracts/`의 계약을 바꾸지 않는다.
     3. 스키마·마이그레이션을 바꾸지 않는다.
     4. 공개 인터페이스(API 시그니처, 컴포넌트 입력 규격, 엔티티 구조)를 바꾸지 않는다.
     5. 새 의존성을 추가하지 않으며 `design.md`의 스택·소유권·규약에 영향이 없다.
@@ -239,7 +239,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 
 ## 🔧 주입 스크립트 레퍼런스 (`.codex/tools/inject-design.mjs`)
 
-이 스크립트는 두 표면에 동일하게 설치되는 하나의 원본이다(`bin/cli.mjs` 상단 설명 참고) — `.codex/tools/`에서 실행하면 `.codex/agents/`에만 주입하고, `design.md`는 표면과 무관하게 항상 `.claude/_workspace/`의 공유 원본을 읽는다.
+이 스크립트는 두 호스트에 동일하게 설치되는 하나의 원본이다(`bin/cli.mjs` 상단 설명 참고) — `.codex/tools/`에서 실행하면 `.codex/agents/`에 주입하고, `design.md`도 같은 호스트 밑 `.codex/_workspace/`에서 읽는다. 워크스페이스는 호스트마다 독립이므로 `.claude/_workspace/`의 설계와는 무관하다.
 
 | 명령 | 용도 |
 |---|---|

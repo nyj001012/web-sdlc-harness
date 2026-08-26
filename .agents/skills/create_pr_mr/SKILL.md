@@ -24,7 +24,7 @@ description: 로컬의 feature 브랜치를 원격 저장소에 Push하고, GitH
    - 만약 타겟 브랜치를 명시해야 한다면 `--base main` 옵션을 추가한다.
 
 5. **Fallback 처리 (Fallback)**
-   - Push나 PR/MR 생성에 3회 실패할 경우 `.claude/_workspace/02_issues/pr_mr_fallback.md`에 백업하고 우아하게 종료한다.
+   - Push나 PR/MR 생성에 3회 실패할 경우 `.codex/_workspace/02_issues/pr_mr_fallback.md`에 백업하고 우아하게 종료한다.
 
 ## Why (왜 이렇게 하는가?)
 - **Git Flow의 완벽한 준수:** 로컬에서 작업한 `feature` 브랜치를 원격으로 밀어 올리고(Push), `main`에 병합(Merge)하기 위한 심사를 요청하는 표준 애자일 프로세스를 기계적으로 자동화하기 위함이다.
