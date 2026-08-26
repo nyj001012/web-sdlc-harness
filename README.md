@@ -133,9 +133,35 @@ node .claude/tools/inject-design.mjs --clear    # 주입 블록 제거, 하네�
 - **주입 제외:** `system-architect`(`design.md`의 생산자이므로 낡은 사본 주입 금지)와 `release-manager`(스택 의존성 없음).
 - 주입 블록은 자동 생성 영역이다. `<!-- DESIGN_SPEC:BEGIN -->` ~ `<!-- DESIGN_SPEC:END -->` 구간을 손으로 편집하지 않는다.
 
-## 파이프라인
+## 🚀 에이전트 오케스트레이션 파이프라인 (Pipeline Architecture)
 
-`run_web_sdlc` 스킬이 마스터 오케스트레이터로서 페이즈를 동적 라우팅한다.
+`run_web_sdlc` 스킬이 마스터 오케스트레이터로서 페이즈를 동적 라우팅한다. 오케스트레이터를 중심에 둔 **스타(hub-and-spoke) 위상**이며, 서브 에이전트는 스폰 ➔ 작업 ➔ 최종 보고 ➔ 종료하고 역할 간 전달은 오케스트레이터가 중계한다. 이 하네스는 진입 단계(Phase 0)의 검증 결과에 따라 **Fast**와 **Heavy** 두 가지 트랙으로 분기하여 에이전트를 구동한다.
+
+### 1. 전체 파이프라인 개요 (High-Level Flow)
+> 💡 각 Phase의 상세 동작 및 에이전트 배치는 아래 표와 「2. Phase 3 상세 아키텍처」를 참고하라.
+
+```mermaid
+%%{init: {'theme': 'neutral', 'config': {'useMaxWidth': true}}}%%
+graph TD
+    P0[Phase 0: 진입 검사] -->|Fast 트랙| P2_F[Phase 2: Fast PM]
+    P0 -->|Heavy 트랙| P1[Phase 1: 아키텍트 SSOT]
+
+    %% Fast Track
+    P2_F --> P3_F[Phase 3: Fast 구현 & 리뷰]
+    P3_F -->|성공| P5[Phase 5: 릴리스 & 문서화]
+    P3_F -->|반려 2회 초과 시 Heavy 승격| P1
+
+    %% Heavy Track
+    P1 --> P2_H[Phase 2: 티켓팅 & 계약 수립]
+    P2_H --> P3_H[Phase 3: 멀티 트랙 병렬 개발]
+    P3_H --> P4[Phase 4: E2E 통합 테스트]
+    P4 -->|성공| P5
+    P4 -->|실패 시 Pinpoint 재스폰| P3_H
+
+    style P0 fill:#f9f,stroke:#333,stroke-width:2px
+    style P4 fill:#bbf,stroke:#333,stroke-width:2px
+    style P5 fill:#bfb,stroke:#333,stroke-width:2px
+```
 
 | Phase | 하는 일 | 투입 에이전트 |
 |---|---|---|
@@ -148,8 +174,8 @@ node .claude/tools/inject-design.mjs --clear    # 주입 블록 제거, 하네�
 
 라우팅은 **두 축**으로 정해진다.
 
-- **라우트** — 어느 페이즈를 도는가. (전체 구축 / FE 단독 / BE 단독 / 인프라 단독 / 문서 단독 / 하네스 메타)
-- **난이도** — 그 페이즈를 얼마나 두껍게 도는가. (Fast / Heavy)
+- **라우트** — 어느 페이즈를 도는가. (전체 구축 / FE 단독 / BE 단독 / 인프라 단독 / 문서 단독 / 하네스 메타). 라우트 6개는 **상호 배타적 선택**이다 — 동시에 갈라지는 분기가 아니라 필요한 페이즈의 부분집합을 고르는 스위치다.
+- **난이도** — 그 페이즈를 얼마나 무겁게 거치는가. (Fast는 가볍고 빠르게 거치고, Heavy는 무겁게 거친다.) 라우트 위에 겹치는 **두 번째 스위치**로, 고른 페이즈 집합의 무게를 다시 조정한다.
 
 | | Fast | Heavy |
 |---|---|---|
@@ -159,45 +185,55 @@ node .claude/tools/inject-design.mjs --clear    # 주입 블록 제거, 하네�
 
 - ⚖️ **애매하면 Heavy다.** 오분류 비용이 비대칭이다 — Fast를 Heavy로 잘못 보면 토큰이 낭비되는 것으로 끝나지만, 반대는 QA 없이·E2E 없이 구현물이 나간다.
 - **Fast에서도 `code-reviewer`와 설계 명세 주입은 생략하지 않는다.** 읽기 전용 단일 패스는 파이프라인에서 가장 싼 게이트이고, 페이즈를 줄이는 것과 스택 명세 없이 구현하는 것은 다른 문제다.
-- **Fast에서 반려가 2회 나오면 Heavy로 승격한다.** 반려가 반복된다는 것은 애초에 국소 변경이 아니었다는 신호다.
 - 난이도 판별에 **전용 에이전트를 두지 않는다.** 오케스트레이터가 이미 요청을 컨텍스트에 갖고 있으므로, 판단을 서브 에이전트로 내보내는 것은 스폰 1회를 사서 이미 아는 결론을 되받는 것이다. 타겟 파일을 모를 때만 범용 탐색 서브 에이전트를 haiku로 1건 붙여 경로 탐색을 격리한다.
 
 각 페이즈 종료 시 오케스트레이터가 마이크로 커밋을 남기고, `<호스트>/_workspace/log/orchestrator-log.jsonl`에 감사 로그를 append한다.
 
-## 파이프라인의 구조 형태
+### 2. Phase 3 상세 아키텍처 (Heavy Track Details)
 
-오케스트레이터를 중심에 둔 **스타(hub-and-spoke) 위상**이며, 페이즈 골격은 선형이다. 서브 에이전트는 스폰 ➔ 작업 ➔ 최종 보고 ➔ 종료하고, 역할 간 전달은 오케스트레이터가 중계한다.
+Heavy 트랙 진입 시, **Track A(팀 협업)**와 **Track B(DevOps 고립)**가 서로 모른 채 나란히 진행된다.
 
-라우트 6개는 **상호 배타적 선택**이다. 동시에 갈라지는 분기가 아니라 필요한 페이즈의 부분집합을 고르는 스위치다. 난이도는 그 위에 겹치는 **두 번째 스위치**로, 고른 페이즈 집합을 다시 얇게 만든다. 반면 Heavy 전체 구축 라우트 안에서는 팬아웃과 팬인이 각각 두 겹으로 나타난다.
+- **Track A:** FE/BE/DB 레인이 계약 기반으로 움직이며, 변경 완료 후 `code-reviewer`로 수렴(Fan-in)한다. (반려 시 최대 3회 순환)
+- **Track B:** `devops-engineer`가 독자적으로 인프라 작업을 수행한다.
+- **합류 지점:** 두 트랙은 간선 없이 오케스트레이터의 커밋 시점에 `Phase 4 (E2E)`에서 최종 동기화된다.
 
-```
-Phase 0  라우트 판별 ➔ 난이도 판별 ➔ 런타임 검사 ➔ 설계 주입 ➔ 스택 확보 검사
-   │
-   ├─ Fast ─➔ Phase 2 (issue-pm) ─➔ Phase 3 (구현 1건 ➔ code-reviewer 1패스) ─➔ Phase 5
-   │             └─ 계약·스키마·공개 인터페이스 무변경이 전제. 반려 2회면 Heavy로 승격해 아래로 합류
-   │
-   ▼ Heavy
-Phase 1  system-architect ──➔ design.md (SSOT)
-   │
-Phase 2  issue-pm (티켓·브랜치)  ·  tech-leader (계약)
-   │        └─ 계약의 완결성이 아래 레인 폭을 결정한다
-   ▼
-Phase 3 ─┬─ Track A (팀 모드 · P2P)
-         │     FE 레인:  frontend-qa ➔ frontend-developer ─┐
-         │     BE 레인:  backend-qa  ➔ backend-developer  ─┤
-         │     DB 레인:  db-engineer  (스키마 ➔ BE 선행)  ─┤
-         │                                                 ▼
-         │                         code-reviewer   ← 팬인 ① (수렴만 함 · 대기 없음)
-         │                              ↑ 반려 순환 (최대 3회)
-         │
-         └─ Track B (서브 에이전트 · 고립):  devops-engineer
-                     │
-   ┌─────────────────┘  두 트랙은 간선 없이 오케스트레이터의 커밋에서만 합류
-   ▼
-Phase 4  e2e-tester    ← 팬인 ② (동기화 지점 · FE·BE·데이터 모두 완료돼야 진입)
-   │        └─ 실패 시 area(fe|be|data|infra) 판정 ➔ 해당 역할만 재스폰 (핀포인트)
-   │
-Phase 5  release-manager  ·  tech-writer
+```mermaid
+%%{init: {'theme': 'neutral', 'flowchart': {'rankSpacing': 70, 'nodeSpacing': 40}, 'config': {'useMaxWidth': true}}}%%
+graph TD
+    subgraph Track_A [Track A: 팀 모드]
+        direction TB
+        subgraph DB [DB 레인]
+            db[db-engineer <br> 스키마 설계]
+        end
+        subgraph BE [BE 레인]
+            be_qa[backend-qa] --> be_dev[backend-developer]
+        end
+        subgraph FE [FE 레인]
+            fe_qa[frontend-qa] --> fe_dev[frontend-developer]
+        end
+        
+        db -->|스키마 선행 선언| be_qa
+    end
+
+    subgraph Track_B [Track B: 고립 모드]
+        devops[devops-engineer <br> 인프라 작업]
+    end
+
+    %% 수렴 및 리뷰 루프
+    fe_dev --> CR[code-reviewer <br> 📥 팬인 ① 수렴]
+    be_dev --> CR
+    CR -.->|반려 시 순환<br>최대 3회| fe_dev
+    CR -.->|반려 시 순환<br>최대 3회| be_dev
+
+    %% 최종 합류 (Phase 4)
+    CR --> P4[⚡ Phase 4: E2E 통합 테스트 <br> 🔄 팬인 ② 동기화 지점]
+    devops -->|오케스트레이터 커밋 합류| P4
+
+    %% 실패 시 복구
+    P4 -.->|실패 시 area 판정| Track_A
+
+    style CR fill:#ffcccb,stroke:#333
+    style P4 fill:#bbf,stroke:#333,stroke-width:2px
 ```
 
 - **팬아웃 ①** — Phase 3의 Track A ∥ Track B. Track B(`devops-engineer`)는 서브 에이전트라 Track A와 간선이 없다. 서로를 모른 채 달리고 오케스트레이터의 마이크로 커밋에서 합류한다.
@@ -206,7 +242,11 @@ Phase 5  release-manager  ·  tech-writer
   - 레인을 더 쪼갤 때는 **화면·기능 단위로 같은 타입을 복제**한다(`frontend-developer-1/-2`). 관심사(마크업·스타일·이벤트) 축으로 쪼개면 같은 파일을 여럿이 써서 병합으로 되돌려야 하고, 그러면 결국 직렬화된다 — 병합이 필요한 분할은 경계가 아니다. 복제는 정의 파일이 같아 주입 접두사를 공유하므로 캐시도 유리하다.
 - **팬인 ① — 모이기만 하고 기다리지 않는다.** 두 레인이 단일 `code-reviewer`에게 리뷰를 요청하므로 선은 한 점으로 모인다. 그러나 리뷰어는 도착한 레인을 각각 따로 처리한다. FE가 승인을 받는 동안 BE는 두 번째 반려를 받고 되돌아가는 중일 수 있다.
 - **팬인 ② — 모여서 기다린다.** Phase 4는 Track A의 모든 레인이 끝나야 진입한다. 한 레인이라도 남아 있으면 시작하지 않는다. 완료를 실제로 요구하는 유일한 지점이다.
-- **팬인 ②의 되돌아가는 간선** — E2E가 깨지면 `e2e-tester`가 `area`(`fe`/`be`/`data`/`infra`/`unknown`)와 압축된 근거로 판정을 반환하고, 오케스트레이터가 **해당 역할만** 재스폰한다. 리더 노드가 없어도 핀포인트 라우팅이 성립한다 — 판정 한 필드가 조직도의 역할을 대신한다. 로그 전문은 오케스트레이터 컨텍스트에 싣지 않는다(말미 50줄 상한).
+
+### 🛠️ 실패 및 예외 처리 (Error Handling)
+
+1. **Fast 트랙 반려 (Phase 3):** 계약/스키마/공개 인터페이스 무변경 전제가 깨지거나 반려가 2회 누적되면 즉시 **Heavy 트랙(Phase 1)으로 승격**되어 아키텍트 검증을 다시 받는다. 반려가 반복된다는 것은 애초에 국소 변경이 아니었다는 신호다.
+2. **E2E 테스트 실패 (Phase 4):** 전체 파이프라인을 롤백하지 않고, `e2e-tester`가 실패 원인을 분석하여 `area`(`fe`/`be`/`data`/`infra`/`unknown`)와 압축된 근거로 판정을 반환한다. 오케스트레이터가 **해당 역할만** 핀포인트(Pinpoint)로 재스폰한다 — 리더 노드가 없어도 판정 한 필드가 조직도의 역할을 대신한다. 로그 전문은 오케스트레이터 컨텍스트에 싣지 않는다(말미 50줄 상한).
 
 ### 왜 스타인가
 
@@ -322,7 +362,7 @@ tools/                             # 어느 호스트에도 속하지 않는 유
 - **객관적 룰북** — 리뷰 기준은 리뷰어의 취향이 아니라 주입된 `<design_spec>`이다. 규약에 없는 지적은 반려가 아닌 "규약 공백" 제안으로 처리한다.
 - **설계는 읽지 않고 주입한다** — 하위 에이전트에게 설계 조회를 시키지 않는다. 하네스가 스폰 전에 전문을 시스템 프롬프트에 보간하여 캐시 가능한 불변 접두사로 만든다.
 - **3회 재시도 후 `[PASS WITH WARNING]`** — 무한 핑퐁을 막되 산출물은 보존하고, 인간 개입이 필요한 지점을 명시적으로 남긴다.
-- **난이도는 라우트와 직교한다** — 라우트가 어느 페이즈를 도는지 정하고, 난이도가 얼마나 두껍게 도는지 정한다. 애매하면 Heavy로 편향한다. 오분류 비용이 비대칭이기 때문이다.
+- **난이도는 라우트와 독립된 축이다** — 라우트가 어느 페이즈를 도는지 정하고, 난이도가 그 페이즈를 얼마나 무겁게 거치는지 정한다. 애매하면 Heavy로 편향한다. 오분류 비용이 비대칭이기 때문이다.
 - **역할을 늘리기보다 인스턴스를 복제한다** — 주입 방식 때문에 새 agent type은 캐시 접두사를 하나 더 만들고, 파이프라인당 1회 스폰이면 그 미스를 회수할 기회가 없다. 병렬화가 필요하면 파일 트리가 겹치지 않는 축으로 같은 타입을 복제한다.
 - **판정 한 필드가 조직도를 대체한다** — 실패를 어느 역할에 넘길지는 리더 계층이 있어야 정해지는 것이 아니다. `e2e-tester`의 `area` 한 필드로 재스폰 대상이 결정되므로, 계층을 늘리지 않고 핀포인트 라우팅이 성립한다.
 - **P2P 통신은 Claude Code 호스트의 Track A 한정** — Claude Code에서는 팀 모드를 Phase 3 Track A(QA ↔ Developer ↔ Reviewer)에만 쓴다. 그 구간의 팀원은 리더를 거치지 않고 서로 직접 `SendMessage`로 피드백 루프를 돈다. 그 밖의 역할은 모두 서브 에이전트이며 **발신 대상이 없다** — 다른 역할에 전달할 내용은 최종 보고에 담고 오케스트레이터가 중계한다. 브로드캐스트(`to: "all"`)는 쓰지 않는다.
