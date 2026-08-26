@@ -13,16 +13,16 @@
  *   같은 소스를 그대로 공유할 수 없다. 그래서 패키지는 `.claude/`와 `.codex/`
  *   두 벌의 소스 트리를 따로 담고 있으며, 설치 시 `--claude`/`--codex`로 대상
  *   호스트를 고른다(기본값은 둘 다). `tools/`(design.md 정적 주입기)만은 규격
- *   차이가 없는 순수 Node 스크립트이므로 `.claude/tools/`를 유일한 원본으로 두고
- *   두 호스트 모두에 같은 파일을 복사한다 — 두 벌을 따로 관리하면 한쪽만 고치는
- *   드리프트가 생기기 때문이다.
+ *   차이가 없는 순수 Node 스크립트이므로 어느 호스트에도 속하지 않는 저장소
+ *   루트의 `tools/`를 유일한 원본으로 두고 두 호스트 모두에 같은 파일을 복사한다
+ *   — 두 벌을 따로 관리하면 한쪽만 고치는 드리프트가 생기기 때문이다.
  *
  * 예외: Codex의 스킬 배치 경로.
  *   Codex CLI는 스킬(SKILL.md)을 `.codex/` 밑이 아니라 저장소 루트 기준
  *   `.agents/skills/`에서 탐색한다(공식 문서 확인). 그래서 `codex` 호스트만
  *   `skills`의 목적지가 `.codex/skills`가 아니라 `.agents/skills`다 — 아래
  *   `hostPath()`가 이 예외 하나만 처리한다. Codex 에이전트(`.codex/agents/*.toml`)와
- *   공유 `tools/`는 이 예외 밖이다.
+ *   루트 `tools/`는 이 예외 밖이다.
  *
  * 설계 명세(design.md)와 워크스페이스는 호스트마다 독립이다:
  *   `_workspace/`는 설치된 각 호스트 밑에 따로 생긴다 — Claude 호스트는 `.claude/_workspace/`,
@@ -76,15 +76,17 @@ const ALL_HOSTS = ['claude', 'codex'];
 /**
  * 각 호스트 아래로 복사할 하위 트리. `_workspace/`는 런타임 산출물이라 제외한다.
  *
- * `tools`는 예외적으로 항상 `.claude/tools`(원본 하나)에서 읽는다 — design.md
- * 주입기는 두 호스트 모두 동일한 스크립트이므로, 원본을 두 벌 관리해 드리프트를
- * 만들 이유가 없다. 설치 결과물은 그래도 각 호스트 하위에 자기완결적으로 놓인다
- * (`target/.codex/tools/inject-design.mjs`처럼 호스트마다 사본이 생긴다).
+ * `tools`는 예외적으로 어느 호스트에도 속하지 않는 저장소 루트의 `tools/`(원본
+ * 하나)에서 읽는다 — design.md 주입기는 두 호스트 모두 동일한 스크립트이므로,
+ * 원본을 두 벌 관리해 드리프트를 만들 이유가 없고, 특정 호스트 밑에 두면 그
+ * 호스트가 "원본을 가진 쪽"이라는 잘못된 인상을 준다. 설치 결과물은 그래도 각
+ * 호스트 하위에 자기완결적으로 놓인다(`target/.codex/tools/inject-design.mjs`처럼
+ * 호스트마다 사본이 생긴다).
  */
 const COPY_DIRS = ['agents', 'skills', 'tools'];
 
-/** 위 COPY_DIRS 중 원본을 다른 호스트에서 가져오는 예외 매핑. 나머지는 자기 호스트에서 읽는다. */
-const SOURCE_HOST_OVERRIDE = { tools: 'claude' };
+/** `tools`의 원본 경로. 호스트 디렉터리 밖, 저장소 루트에 독립적으로 둔다. */
+const TOOLS_SRC = join(PKG_ROOT, 'tools');
 
 /**
  * 대상에 빈 디렉터리로 확보할 경로. 설치된 호스트마다 자기 밑에 따로 둔다
@@ -178,8 +180,8 @@ const log = (message) => console.log(`[harness] ${message}`);
 /** 한 호스트의 패키지 소스 트리를 검증하고 {name, host, src, files} 목록을 낸다. */
 function readSources(host) {
   const sources = COPY_DIRS.map((name) => {
-    const srcHost = SOURCE_HOST_OVERRIDE[name] ?? host;
-    return { name, host, src: join(PKG_ROOT, hostPath(srcHost, name)) };
+    const src = name === 'tools' ? TOOLS_SRC : join(PKG_ROOT, hostPath(host, name));
+    return { name, host, src };
   });
   const missing = sources.filter((s) => !existsSync(s.src));
   if (missing.length) {
@@ -438,7 +440,7 @@ function preflight() {
    * `.gitattributes`가 1차 방어선이지만, 에디터가 CRLF로 저장하거나 파일이 다른
    * 경로로 들어오면 다시 깨진다. publish를 막는 이 게이트가 최종 방어선이다.
    */
-  const scripts = [join('bin', 'cli.mjs'), join('.claude', 'tools', 'inject-design.mjs')];
+  const scripts = [join('bin', 'cli.mjs'), join('tools', 'inject-design.mjs')];
   for (const relPath of scripts) {
     const full = join(PKG_ROOT, relPath);
     if (!existsSync(full)) continue;

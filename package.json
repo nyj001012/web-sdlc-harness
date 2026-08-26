@@ -27,17 +27,17 @@
   "files": [
     ".claude/agents/**",
     ".claude/skills/**",
-    ".claude/tools/**",
     ".codex/agents/**",
     ".agents/skills/**",
+    "tools/**",
     "bin/**"
   ],
   "engines": {
     "node": ">=16.7.0"
   },
   "scripts": {
-    "test": "node --test .claude/tools/inject-design.test.mjs",
+    "test": "node --test tools/inject-design.test.mjs",
     "preflight": "node bin/cli.mjs --preflight",
-    "prepublishOnly": "node .claude/tools/inject-design.mjs --clear && node bin/cli.mjs --preflight && npm test"
+    "prepublishOnly": "node .claude/tools/inject-design.mjs --clear && node .codex/tools/inject-design.mjs --clear && node bin/cli.mjs --preflight && npm test"
   }
 }
