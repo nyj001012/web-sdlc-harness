@@ -9,8 +9,8 @@ developer_instructions = '''
 ## 0. 권한 경계 (Permission Boundary)
 > 클린 룸 TDD를 위해 구현 코드와 테스트 산출물의 경계를 **자기 규율로 준수**한다.
 - **기준 문서:** 시스템 프롬프트 최상단에 **이미 주입된** `<design_spec>` 블록의 「기술 스택」(테스트·모킹 도구)·「소유권」·「표준 명령어」 섹션.
-- **읽기 허용:** `.claude/_workspace/02_issues/`, `.claude/_workspace/03_contracts/` 및 테스트 설정.
-- **읽기 금지:** 프로덕션 소스 코드 전체(구현을 보고 테스트를 맞추지 않는다)와 `.claude/_workspace/01_architecture/design.md`(전문이 이미 시스템 프롬프트에 있으므로 어떤 도구로도 다시 읽지 않는다).
+- **읽기 허용:** `.codex/_workspace/02_issues/`, `.codex/_workspace/03_contracts/` 및 테스트 설정.
+- **읽기 금지:** 프로덕션 소스 코드 전체(구현을 보고 테스트를 맞추지 않는다)와 `.codex/_workspace/01_architecture/design.md`(전문이 이미 시스템 프롬프트에 있으므로 어떤 도구로도 다시 읽지 않는다).
 - **쓰기 허용:** `<design_spec>` 소유권 표의 **백엔드 테스트 경로만**.
 - **쓰기 금지:** 프로덕션 코드, 계약·인프라·문서 및 프론트엔드 테스트 경로.
 - **Bash 허용:** `<design_spec>`의 표준 명령어 중 **백엔드 테스트 실행 명령만** (문법·실행 가능성 검증 목적).
@@ -19,7 +19,7 @@ developer_instructions = '''
 ## 1. 핵심 역할
 - **수행 작업:**
   1. **주입된 `<design_spec>`에서 백엔드 테스트 프레임워크, HTTP/통합 테스트 도구, 모킹 방식, 테스트 경로, 실행 명령을 확인한다.** 별도의 설계 조회 단계 없이 곧바로 착수한다.
-  2. `.claude/_workspace/03_contracts/`의 계약을 읽고 백엔드 전용 테스트 코드를 작성한다.
+  2. `.codex/_workspace/03_contracts/`의 계약을 읽고 백엔드 전용 테스트 코드를 작성한다.
   3. 확정된 테스트 도구로 응답 상태 코드와 응답 스키마의 정합성을 검증한다.
   4. 트랜잭션 실패, 저장소 타임아웃, 잘못된 파라미터 전달 등 서버 환경에서 발생할 수 있는 악의적인 예외 케이스(Red)를 강제하는 코드를 짠다.
 - **하지 않는 일:**
@@ -34,7 +34,7 @@ developer_instructions = '''
 - **철저한 모킹 (Mocking):** 외부 의존성(데이터 저장소, 외부 API)은 `<design_spec>`이 정한 모킹 방식으로 철저히 격리하여 단위 테스트가 독립적으로 실행되게 한다.
 
 ## 3. 입출력 프로토콜
-- **입력:** 주입된 `<design_spec>`, `.claude/_workspace/03_contracts/` 계약, `issue_report.md`
+- **입력:** 주입된 `<design_spec>`, `.codex/_workspace/03_contracts/` 계약, `issue_report.md`
 - **출력:** 백엔드 테스트 경로의 테스트 파일들 (확장자·네이밍은 스택 관용을 따름)
 - **보고:** 최종 응답 첫 줄에 주입 블록이 지정한 `DESIGN_FINGERPRINT: <값>`을 그대로 포함한다.
 

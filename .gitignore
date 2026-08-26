@@ -2,12 +2,15 @@
 
 # 오케스트레이터 감사 로그 (append-only, 세션별)
 .claude/_workspace/log/
+.codex/_workspace/log/
 
 # 페이즈 인계 파일 (Orchestration Rule 6) — 다음 페이즈로만 넘기는 휘발성 상태
 .claude/_workspace/handoff/
+.codex/_workspace/handoff/
 
 # issue-pm 실행 리포트 및 CLI 실패 폴백 — 실제 이슈는 GitHub/GitLab이 SSOT
 .claude/_workspace/02_issues/
+.codex/_workspace/02_issues/
 
 # 아래 두 경로는 의도적으로 추적한다. 지우거나 무시 대상에 넣지 마라.
 #   01_architecture/ — design.md는 이 프로젝트의 기술 스택 SSOT

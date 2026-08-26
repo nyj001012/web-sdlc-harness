@@ -28,7 +28,7 @@ description: "기획서와 이슈를 바탕으로 프론트엔드(UI/State), 백
    - `Bash` 도구로 `<design_spec>`의 계약 검증 명령(정적 타입 검사 또는 스키마 린트)을 실행해 오류가 없는지 확인한다. 3회까지 자체 수정한다.
 
 6. **계약 산출물 적재 (Save Contracts)**
-   - 검증이 완료된 계약 파일들을 오직 `.claude/_workspace/03_contracts/` 경로 하위에만 저장하고 종료한다.
+   - 검증이 완료된 계약 파일들을 오직 `.codex/_workspace/03_contracts/` 경로 하위에만 저장하고 종료한다.
 
 ## Why (왜 이렇게 하는가?)
 

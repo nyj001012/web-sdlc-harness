@@ -13,7 +13,7 @@ description: 프론트엔드와 백엔드 구현이 완료된 후, 아키텍처�
    - 🚨 **주의:** E2E 도구를 스스로 가정하지 않는다. 명시가 없으면 작성을 멈추고 `[SPEC GAP]`을 붙여 호출자에게 질의한다.
 
 2. **시나리오 및 DoD 분석 (Scenario Review)**
-   - `.claude/_workspace/02_issues/` 하위의 완료된 이슈 명세서와 주입된 `<design_spec>`을 분석한다.
+   - `.codex/_workspace/02_issues/` 하위의 완료된 이슈 명세서와 주입된 `<design_spec>`을 분석한다.
    - 🚨 **주의:** 내부 구현 코드를 훔쳐보고 테스트를 맞추려 하지 말고, 오직 '사용자의 관찰 가능한 행동과 결과' 관점에서만 시나리오를 기획한다.
 
 3. **E2E 테스트 스크립트 작성 (Test Implementation)**

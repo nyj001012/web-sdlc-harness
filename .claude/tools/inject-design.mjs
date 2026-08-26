@@ -8,20 +8,21 @@
  *   각 에이전트의 **시스템 프롬프트 최상단**에 정적으로 보간(Interpolation)한다.
  *
  * 왜:
- *   Claude Code·Codex 모두에서 `<surface>/agents/<name>.md`(`.claude/` 또는 `.codex/`)의
+ *   Claude Code·Codex 모두에서 `<host>/agents/<name>.md`(`.claude/` 또는 `.codex/`)의
  *   본문은 그대로 해당 서브 에이전트의 시스템 프롬프트가 된다. 시스템 프롬프트는
  *   대화의 불변 접두사이므로, 같은 에이전트 타입을 여러 번 스폰해도 이 영역은
  *   캐시 히트된다. 반면 `Read` 도구 호출은 (1) 에이전트마다 왕복 1회를 추가로
  *   소모하고, (2) 설계 전문이 접두사가 아니라 대화 중간에 들어가며, (3) 에이전트가
  *   일부만 읽거나 건너뛰는 비결정적 동작을 허용한다.
  *
- * 이 스크립트는 표면(`.claude`/`.codex`) 어느 쪽에 설치되어도 동일하게 동작한다.
- * 자기 위치(`import.meta.url`)로 어느 표면인지 판별해 그 표면의 `agents/`에만
- * 주입하지만, `design.md`는 표면과 무관하게 항상 `<repoRoot>/.claude/_workspace/`에서
- * 읽는다 — 두 표면이 같은 프로젝트에서 서로 다른 설계 명세를 SSOT로 삼으면 안 되기
- * 때문이다 (`bin/cli.mjs` 상단 설명 참고).
+ * 이 스크립트는 호스트(`.claude`/`.codex`) 어느 쪽에 설치되어도 동일하게 동작한다.
+ * 자기 위치(`import.meta.url`)로 어느 호스트인지 판별해 그 호스트의 `agents/`에 주입하고,
+ * `design.md`도 같은 호스트 밑 `_workspace/`에서 읽는다 — 워크스페이스는 호스트마다
+ * 독립이다 (`bin/cli.mjs` 상단 설명 참고). 한 프로젝트에서 두 호스트를 오가며 같은
+ * 설계를 이어 쓰려면 호스트를 바꿀 때 `design.md`를 다시 확정하거나 수동으로
+ * 복사해야 한다.
  *
- * 사용법 (설치된 표면의 경로를 그대로 쓴다. 아래는 `.claude` 기준 예시):
+ * 사용법 (설치된 호스트의 경로를 그대로 쓴다. 아래는 `.claude` 기준 예시):
  *   node .claude/tools/inject-design.mjs            # 주입 (기본)
  *   node .claude/tools/inject-design.mjs --check    # 주입 상태 검증만 (드리프트 시 exit 1)
  *   node .claude/tools/inject-design.mjs --clear     # 주입 블록 제거 (하네스 원본 복원)
@@ -39,21 +40,21 @@ import { fileURLToPath } from 'node:url';
 // 경로 상수
 // ─────────────────────────────────────────────────────────────
 const HERE = dirname(fileURLToPath(import.meta.url));
-const SURFACE_DIR = resolve(HERE, '..');          // 이 스크립트가 설치된 표면 자신: .claude 또는 .codex
-const REPO_ROOT = resolve(SURFACE_DIR, '..');
-// design.md·워크스페이스는 표면과 무관하게 항상 `.claude/_workspace/`에 고정한다.
-const DESIGN_PATH = join(REPO_ROOT, '.claude', '_workspace', '01_architecture', 'design.md');
-const AGENTS_DIR = join(SURFACE_DIR, 'agents');
+const HOST_DIR = resolve(HERE, '..');          // 이 스크립트가 설치된 호스트 자신: .claude 또는 .codex
+const REPO_ROOT = resolve(HOST_DIR, '..');
+// design.md·워크스페이스는 이 스크립트가 설치된 호스트(HOST_DIR) 밑에 독립적으로 둔다.
+const DESIGN_PATH = join(HOST_DIR, '_workspace', '01_architecture', 'design.md');
+const AGENTS_DIR = join(HOST_DIR, 'agents');
 
 /**
- * 표면별 에이전트 정의 형식. Claude Code는 YAML 프론트매터 + Markdown 본문(`.md`)이고,
+ * 호스트별 에이전트 정의 형식. Claude Code는 YAML 프론트매터 + Markdown 본문(`.md`)이고,
  * Codex 커스텀 에이전트는 TOML(`.toml`)이다 — `name`·`description`·`developer_instructions`
  * (전체 지침을 담는 문자열 필드)가 필수이고, `tools`/`allowed-tools` 같은 도구 화이트리스트
  * 필드는 아예 없다(권한은 `sandbox_mode`로 통제). 두 형식 모두 원시 텍스트에서 BEGIN/END
  * 마커를 문자열 검색으로 찾고 잘라 붙이는 동일한 로직을 쓰며, 다른 것은 "처음 주입할 때
  * 어디에 꽂을지"(프론트매터 직후 vs `developer_instructions` 문자열 시작)뿐이다.
  */
-const FORMAT = basename(SURFACE_DIR) === '.codex' ? 'toml' : 'md';
+const FORMAT = basename(HOST_DIR) === '.codex' ? 'toml' : 'md';
 const AGENT_EXT = FORMAT === 'toml' ? '.toml' : '.md';
 
 const BEGIN = '<!-- DESIGN_SPEC:BEGIN -->';
@@ -285,8 +286,8 @@ function buildBlock(design) {
   // design.md 본문이 종료 마커를 포함하면 블록 경계가 깨지므로 무력화한다.
   const safe = design.split(END).join('<!-- DESIGN_SPEC:END(escaped) -->');
   const fp = fingerprintOf(safe);
-  // 지문은 표면과 무관하게 항상 이 `safe` 텍스트로만 계산한다 — TOML 표면용 추가
-  // 이스케이프(아래)가 지문에 섞이면 같은 design.md인데도 표면마다 지문이 갈라진다.
+  // 지문은 호스트와 무관하게 항상 이 `safe` 텍스트로만 계산한다 — TOML 호스트용 추가
+  // 이스케이프(아래)가 지문에 섞이면 같은 design.md인데도 호스트마다 지문이 갈라진다.
   const embedded = FORMAT === 'toml' ? escapeTomlLiteral(safe) : safe;
 
   return [
