@@ -53,9 +53,11 @@ Claude Code·Codex CLI를 **네이티브 인스톨러로 설치한 환경에는 
 
 ```bash
 git clone --depth 1 https://github.com/nyj001012/web-sdlc-harness.git /tmp/harness
-cp -r /tmp/harness/.claude/{agents,skills,tools} <대상>/.claude/   # Claude Code 호스트
-cp -r /tmp/harness/.codex/{agents,tools} <대상>/.codex/            # Codex 호스트 (에이전트·주입기)
-cp -r /tmp/harness/.agents/skills <대상>/.agents/                  # Codex 스킬 (자동 탐색 경로가 다르다)
+cp -r /tmp/harness/.claude/{agents,skills} <대상>/.claude/   # Claude Code 호스트 (에이전트·스킬)
+cp -r /tmp/harness/.codex/agents <대상>/.codex/               # Codex 호스트 (에이전트)
+cp -r /tmp/harness/tools <대상>/.claude/tools                 # 주입기 — 두 호스트 모두 같은 원본을 각자에 복사한다
+cp -r /tmp/harness/tools <대상>/.codex/tools
+cp -r /tmp/harness/.agents/skills <대상>/.agents/             # Codex 스킬 (자동 탐색 경로가 다르다)
 ```
 
 이 경우 `.gitignore` 병합과 충돌 검사는 직접 해야 한다. 「산출물 구조」의 미추적 세 경로를 참고하라.
@@ -223,7 +225,7 @@ Phase 5  release-manager  ·  tech-writer
 위 팬인 구조는 에이전트 정의의 `연결:` 규약과 페이즈 진입 조건으로 **서술**돼 있으며, 이를 검사하는 기계적 게이트는 없다. Phase 4가 양쪽 완료를 기다리는 것도 오케스트레이터가 지키는 규칙이지 자동 차단 장치가 아니다. 자동 검증이 붙어 있는 것은 주입기 계약과 배포 오염 차단, 두 곳뿐이다.
 
 ```bash
-node --test .claude/tools/inject-design.test.mjs   # 주입기 회귀 테스트 (모드 계약·멱등성·줄바꿈 보존)
+node --test tools/inject-design.test.mjs          # 주입기 회귀 테스트 (모드 계약·멱등성·줄바꿈 보존)
 node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입 블록·런타임 경로·의존성)
 ```
 
@@ -283,14 +285,14 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 ├── package.json                   # 하네스 배포용. 의존성 0, prepublishOnly 게이트
 └── bin/cli.mjs                    # npx 스캐폴더 (init / update / --preflight / --claude / --codex)
 
-(설치되는 두 호스트 — 설치 옵션에 따라 한쪽 또는 둘 다)
-.claude/{agents,skills,tools}/     # Claude Code용(Markdown+YAML). Track A에 P2P 팀 모드 사용
-.codex/{agents,tools}/             # Codex CLI용. agents는 TOML(`<name>.toml`), 항상 허브-스포크(순차 위임) 사용
-.agents/skills/                    # Codex 스킬(SKILL.md). Codex가 이 경로를 자동 탐색한다 — `.codex/skills/`가 아니다
-
-tools/ 안 내용은 두 호스트 모두 동일한 원본 하나에서 복사된다:
+tools/                             # 어느 호스트에도 속하지 않는 유일한 원본. 설치 시 두 호스트 각자의 tools/로 복사된다
 ├── inject-design.mjs              # design.md ➔ 에이전트 시스템 프롬프트 정적 주입기
 └── inject-design.test.mjs         # 주입기 회귀 테스트 (node --test)
+
+(설치되는 두 호스트 — 설치 옵션에 따라 한쪽 또는 둘 다)
+.claude/{agents,skills,tools}/     # Claude Code용(Markdown+YAML). Track A에 P2P 팀 모드 사용. tools/는 위 원본의 사본
+.codex/{agents,tools}/             # Codex CLI용. agents는 TOML(`<name>.toml`), 항상 허브-스포크(순차 위임) 사용. tools/는 위 원본의 사본
+.agents/skills/                    # Codex 스킬(SKILL.md). Codex가 이 경로를 자동 탐색한다 — `.codex/skills/`가 아니다
 
 <호스트>/_workspace/                 # 설치한 호스트(.claude 또는 .codex) 밑에 독립적으로 생긴다
 │
