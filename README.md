@@ -199,7 +199,7 @@ Heavy 트랙 진입 시, **Track A(팀 협업)**와 **Track B(DevOps 고립)**�
 
 ```mermaid
 %%{init: {'theme': 'neutral', 'config': {'useMaxWidth': true}}}%%
-graph LR
+graph TD
     subgraph Track_A [Track A: 팀 모드]
         direction TB
         subgraph DB [DB 레인]
