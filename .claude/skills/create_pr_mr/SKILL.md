@@ -19,12 +19,14 @@ allowed-tools:
    - `git remote -v`로 GitHub/GitLab 여부를 판별한다.
    - `git diff main`을 통해 변경된 코드 범위를 요약한다.
 
-3. **범용 템플릿 작성 (Template Generation)**
-   - `Resolves #이슈번호`와 두괄식 핵심 요약이 포함된 MR/PR 본문을 작성한다.
+3. **템플릿 확인 및 본문 작성 (Template Check & Body Generation)**
+   - 저장소에 PR/MR 템플릿이 있는지 확인한다 — GitHub는 `.github/PULL_REQUEST_TEMPLATE.md`(단일 파일) 또는 `.github/PULL_REQUEST_TEMPLATE/*.md`(여러 템플릿), GitLab은 `.gitlab/merge_request_templates/*.md`.
+   - 템플릿이 있으면 그 섹션 구조를 그대로 따라 채운다. `Resolves #이슈번호`와 두괄식 핵심 요약은 템플릿에 해당 자리가 없어도 최상단에 반드시 포함한다.
+   - 템플릿이 없으면 `Resolves #이슈번호`와 두괄식 핵심 요약이 포함된 범용 본문을 작성한다.
 
 4. **CLI 기반 병합 요청 발행 (Execute CLI)**
-   - **GitHub:** `gh pr create --title "[Feature] 작업명" --body "템플릿"`
-   - **GitLab:** `glab mr create --title "[Feature] 작업명" --description "템플릿" --yes`
+   - **GitHub:** `gh pr create --title "[Feature] 작업명" --body "템플릿"` (템플릿을 그대로 채웠다면 `--body-file <경로>`로 대체 가능)
+   - **GitLab:** `glab mr create --title "[Feature] 작업명" --description "템플릿" --yes` (마찬가지로 `--description-file`로 대체 가능)
    - 만약 타겟 브랜치를 명시해야 한다면 `--base main` 옵션을 추가한다.
 
 5. **Fallback 처리 (Fallback)**
