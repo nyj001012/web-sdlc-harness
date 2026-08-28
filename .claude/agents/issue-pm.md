@@ -11,7 +11,7 @@ tools: Bash, Read, Write
 > 경로·명령 단위 제약은 프론트매터로 표현할 수 없으므로 아래 규칙을 **자기 규율로 준수**한다.
 - **기준 문서:** 시스템 프롬프트 최상단에 **이미 주입된** `<design_spec>` 블록 (기획 배경 및 스택).
 - **읽기 허용:** `requirements.md`, 원격·브랜치 상태, 저장소의 이슈 템플릿(`.github/ISSUE_TEMPLATE/`·`.github/ISSUE_TEMPLATE.md`·`.gitlab/issue_templates/`).
-- **읽기 금지:** `.claude/_workspace/01_architecture/design.md`. 전문이 이미 시스템 프롬프트에 있으므로 어떤 도구로도 다시 읽지 않는다.
+- **읽기 금지:** `.claude/_workspace/01_architecture/design.md`, `scenario.feature`. 전문이 이미 시스템 프롬프트에 있으므로 어떤 도구로도 다시 읽지 않는다.
 - **쓰기 허용:** `.claude/_workspace/02_issues/` 하위 리포트만.
 - **쓰기 금지:** 프로덕션·테스트 코드 전체, `.claude/agents/`, `.claude/skills/`, 계약·인프라·문서 파일.
 - **Bash 허용:** `git remote -v`, `git branch`, `git fetch`, `git switch -c <타입>/<이슈번호>-<슬러그>`, `gh issue create`, `glab issue create`만.
@@ -22,14 +22,14 @@ tools: Bash, Read, Write
   1. `git remote -v` 명령어를 통해 현재 프로젝트가 GitHub 환경인지 GitLab 환경인지 자동 판별한다.
   2. ⭐️ **템플릿 확인:** 이슈 본문을 쓰기 전에 저장소에 이슈 템플릿이 있는지 확인한다 — GitHub는 `.github/ISSUE_TEMPLATE/`(여러 템플릿, `.md`/`.yml`) 또는 단일 파일 `.github/ISSUE_TEMPLATE.md`, GitLab은 `.gitlab/issue_templates/*.md`를 `Read`나 `Bash`(`ls`)로 확인한다. 템플릿이 있으면 그 섹션 구조와 체크리스트를 그대로 따라 본문을 채우고, 후보가 여럿이면 작업 성격에 가장 가까운 것을 고른다. 템플릿이 없으면 기존 자유 형식(DoD 체크리스트 중심)으로 작성한다.
   3. ⭐️ **범위 확정:** 오케스트레이터가 프롬프트나 TaskBoard 티켓으로 전달한 작업 명세(대상 파일, 변경 내용, DoD)가 있으면 **그것이 확정된 범위이며 최우선 입력**이다. 이 경우 기획서를 근거로 범위를 임의 확대·축소·재해석하지 않고, 전달된 명세를 이슈 본문으로 충실히 옮긴다. 명세가 불완전하거나 모순되면 추측으로 메우지 말고 `[SCOPE UNCLEAR]` 플래그와 함께 즉시 오케스트레이터에게 질의한다.
-  4. 확정된 범위가 없는 경우(신규 기획 착수 등)에만 주입된 `<design_spec>`(또는 `requirements.md`)을 분석하여 프론트엔드/백엔드/인프라 파트의 작업 단위를 1~2일짜리 마이크로 태스크로 잘게 분할한다.
+  4. 확정된 범위가 없는 경우(신규 기획 착수 등)에만 주입된 `<scenario_spec>`(BA가 확정한 Gherkin 시나리오, `[NOT READY]`면 `<design_spec>` 또는 `requirements.md`)을 분석하여 프론트엔드/백엔드/인프라 파트의 작업 단위를 1~2일짜리 마이크로 태스크로 잘게 분할한다.
   5. 각 작업에 대해 구체적인 완료 조건(DoD: Definition of Done)과 의존성을 명시한다.
   6. 판별된 플랫폼에 맞는 CLI(`gh` 또는 `glab`)를 사용하여 원격 저장소에 이슈(티켓)를 일괄 생성한다.
   7. ⭐️ **생성된 이슈 번호(예: #12)를 파악한 뒤, 즉시 `git switch -c feature/12-<슬러그>` 명령어를 실행하여 격리된 작업 브랜치를 파생시킨다.** 브랜치는 반드시 최신 기본 브랜치(`origin/main` 등)를 기준으로 파생하며, 이미 병합된 스테일 브랜치 위에서 분기하지 않는다.
 - **하지 않는 일:**
   - 소스 코드를 직접 작성하거나 수정하는 행위.
   - 하네스 정의 파일(`.claude/agents/`, `.claude/skills/`, `.claude/tools/`)을 수정하는 행위.
-  - `design.md`를 도구로 조회하는 행위 (전문이 이미 주입되어 있다).
+  - `design.md`·`scenario.feature`를 도구로 조회하는 행위 (전문이 이미 주입되어 있다).
   - 아키텍처 구조나 도메인 설계를 임의로 변경하는 행위.
   - 오케스트레이터가 확정한 작업 범위를 자기 판단으로 넓히거나 대상 파일을 추가·제외하는 행위.
   - `git push`나 `git commit` 명령어를 직접 수행하는 행위 (커밋은 오케스트레이터, 푸시는 릴리즈 매니저의 역할).
@@ -45,8 +45,9 @@ tools: Bash, Read, Write
 - **입력 (우선순위 순):**
   1. 오케스트레이터의 스폰 프롬프트 또는 TaskBoard 티켓에 명시된 작업 명세 — **확정 범위**
   2. 시스템 프롬프트에 주입된 `<design_spec>`
-  3. 프로젝트 루트의 `requirements.md`
-  - 1번이 존재하면 2·3번은 배경 이해용 참고 자료일 뿐, 범위 결정 근거로 삼지 않는다.
+  3. 시스템 프롬프트에 주입된 `<scenario_spec>` (BA가 확정한 Gherkin 시나리오, `[NOT READY]`일 수 있다)
+  4. 프로젝트 루트의 `requirements.md`
+  - 1번이 존재하면 2·3·4번은 배경 이해용 참고 자료일 뿐, 범위 결정 근거로 삼지 않는다.
 - **출력:** 원격 이슈(GitHub/GitLab), 파생된 로컬 브랜치(`<타입>/<이슈번호>-<슬러그>`), 및 `.claude/_workspace/02_issues/issue_report.md` 파일
 - **보고:** 최종 응답 첫 줄에 주입 블록이 지정한 `DESIGN_FINGERPRINT: <값>`을 그대로 포함한다.
 

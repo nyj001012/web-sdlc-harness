@@ -111,6 +111,10 @@ const IGNORE_HEADER = '# web-sdlc-harness 런타임 산출물 (재현 가능하�
 
 /** 주입 블록 시작 표지. `inject-design.mjs`의 BEGIN과 같은 값이어야 한다. */
 const INJECT_BEGIN = '<!-- DESIGN_SPEC:BEGIN -->';
+/** 시나리오 주입 블록 시작 표지. `inject-scenario.mjs`의 BEGIN과 같은 값이어야 한다. */
+const INJECT_BEGIN_SCENARIO = '<!-- SCENARIO_SPEC:BEGIN -->';
+/** 둘 중 하나라도 있으면 그 파일은 주입 대상이었다는 뜻이다. */
+const hasAnyInjectMarker = (text) => text.includes(INJECT_BEGIN) || text.includes(INJECT_BEGIN_SCENARIO);
 
 // ─────────────────────────────────────────────────────────────
 // 인자 파싱
@@ -198,7 +202,7 @@ const isInstalledAnywhere = () =>
 function injectedAgents(host) {
   const dir = join(TARGET_ROOT, hostPath(host, 'agents'));
   if (!existsSync(dir)) return [];
-  return walk(dir).filter((f) => readFileSync(join(dir, f), 'utf8').includes(INJECT_BEGIN));
+  return walk(dir).filter((f) => hasAnyInjectMarker(readFileSync(join(dir, f), 'utf8')));
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -374,6 +378,7 @@ function update() {
     log(`\u26a0 교체 전 agents/ ${injectedTotal}건에 주입 블록이 있었다. 교체로 사라졌으므로 재주입이 필요하다:`);
     for (const { host } of byHost) {
       log(`    node ${HOST_DIRNAME[host]}/tools/inject-design.mjs`);
+      log(`    node ${HOST_DIRNAME[host]}/tools/inject-scenario.mjs`);
     }
   }
   log('  Claude Code·Codex가 세션 시작 시점의 에이전트 정의를 잡고 있으면 갱신이 반영되지 않는다. 세션을 재시작하라.');
@@ -400,11 +405,11 @@ function preflight() {
       problems.push(`에이전트 정의 디렉터리가 없다: ${toPosix(relative(PKG_ROOT, agentsDir))}`);
       continue;
     }
-    const dirty = walk(agentsDir).filter((f) => readFileSync(join(agentsDir, f), 'utf8').includes(INJECT_BEGIN));
+    const dirty = walk(agentsDir).filter((f) => hasAnyInjectMarker(readFileSync(join(agentsDir, f), 'utf8')));
     if (dirty.length) {
       problems.push(
         `${HOST_DIRNAME[host]}/agents에 주입 블록이 남아 있다 (${dirty.length}건): ${dirty.map(toPosix).join(', ')}\n` +
-        `           \u2192 \`node ${HOST_DIRNAME[host]}/tools/inject-design.mjs --clear\` 를 먼저 실행하라.`,
+        `           \u2192 \`node ${HOST_DIRNAME[host]}/tools/inject-design.mjs --clear\`와 \`node ${HOST_DIRNAME[host]}/tools/inject-scenario.mjs --clear\`를 먼저 실행하라.`,
       );
     }
   }
@@ -440,7 +445,7 @@ function preflight() {
    * `.gitattributes`가 1차 방어선이지만, 에디터가 CRLF로 저장하거나 파일이 다른
    * 경로로 들어오면 다시 깨진다. publish를 막는 이 게이트가 최종 방어선이다.
    */
-  const scripts = [join('bin', 'cli.mjs'), join('tools', 'inject-design.mjs')];
+  const scripts = [join('bin', 'cli.mjs'), join('tools', 'inject-design.mjs'), join('tools', 'inject-scenario.mjs')];
   for (const relPath of scripts) {
     const full = join(PKG_ROOT, relPath);
     if (!existsSync(full)) continue;
