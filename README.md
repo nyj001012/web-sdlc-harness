@@ -286,6 +286,7 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 
 | 에이전트 | 역할 | 모델 |
 |---|---|---|
+| `business-analyst` | 사용자와 질의응답으로 요구사항을 정제해 Gherkin 시나리오 확정 (Phase 1 선행, 조건부) | sonnet |
 | `system-architect` | 기술 스택·구조·규약·소유권 확정, 도메인 경계 설계 | opus |
 | `issue-pm` | 마이크로 태스크 분할, GitHub/GitLab 이슈 생성, 작업 브랜치 파생 | haiku |
 | `tech-leader` | FE/BE/QA가 병렬 개발할 수 있는 인터페이스 계약 설계 | sonnet |
