@@ -5,7 +5,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 
 # Skill: Master Orchestrator Pipeline
 
-이 스킬은 13개의 에이전트 페르소나를 페이즈(Phase)별로 동적 라우팅하여 서브 에이전트로 위임하고, 오케스트레이터가 결과를 중계해 작업을 조율하는 마스터 지휘소다.
+이 스킬은 14개의 에이전트 페르소나를 페이즈(Phase)별로 동적 라우팅하여 서브 에이전트로 위임하고, 오케스트레이터가 결과를 중계해 작업을 조율하는 마스터 지휘소다.
 
 > ⚠️ **Codex 호스트 전용 문서.** 이 파일은 `.agents/skills/run_web_sdlc/`에 설치된다(Codex가 스킬을 탐색하는 경로는 `.codex/`가 아니라 저장소 루트 기준 `.agents/skills/`다). 에이전트 정의는 `.codex/agents/*.toml`에 있다 — Codex의 커스텀 에이전트는 Claude Code의 Markdown+YAML 프론트매터가 아니라 TOML 파일이며, `name`·`description`·`developer_instructions`(전체 지침 문자열)를 필수로, `model_reasoning_effort`·`sandbox_mode`를 선택으로 갖는다. Claude Code 호스트(`.claude/skills/run_web_sdlc/`)에는 P2P 팀 모드를 쓰는 별도 버전이 있다 — Codex의 서브에이전트는 오케스트레이터에게만 결과를 보고하는 허브-스포크 방식이라 팀원 간 상시 채널에 대응하는 기능이 없기 때문이다. 두 문서는 라우팅·페이즈 골격은 같지만 Rule 1과 Phase 3의 실행 방식이 다르다.
 
@@ -23,7 +23,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
    - 각 Phase나 개발 트랙 종료 시, 위임했던 서브 에이전트는 최종 보고와 함께 이미 종료돼 있으므로 별도의 종료 시퀀스가 필요 없다.
    - **Rule 6의 페이즈 인계 파일(`.codex/_workspace/handoff/phase-<N>.md`)을 먼저 기록한다.** 다음 페이즈가 필요한 사실을 파일에 먼저 남긴 뒤 커밋해야, 컨텍스트가 요약되거나 세션이 끊겨도 인계가 끊기지 않는다.
    - **그 뒤에, 오케스트레이터가 직접 `Bash` 도구를 사용하여 해당 Phase의 변경만 스테이징하고 `git commit -m "feat(Phase N): [작업명] 완료"` 형식으로 스냅샷을 저장한다.**
-   - ⛔ **스테이징 전 주입 블록 잔존 확인:** `git status --porcelain`으로 이번 페이즈의 작업 대상이 아닌 `.codex/agents/*.toml`이 수정 목록에 올라와 있는지 확인한다. 주입 블록만 다른 변경이라면 `node .codex/tools/inject-design.mjs --clear`로 복원한 뒤 스테이징한다. `git add -A`나 `git add .codex/`처럼 범위를 넓히는 스테이징을 하지 마라.
+   - ⛔ **스테이징 전 주입 블록 잔존 확인:** `git status --porcelain`으로 이번 페이즈의 작업 대상이 아닌 `.codex/agents/*.toml`이 수정 목록에 올라와 있는지 확인한다. 주입 블록만 다른 변경이라면 `node .codex/tools/inject-design.mjs --clear`와 `node .codex/tools/inject-scenario.mjs --clear`로 복원한 뒤 스테이징한다. `git add -A`나 `git add .codex/`처럼 범위를 넓히는 스테이징을 하지 마라.
    - 📌 **주입 결과를 의도적으로 커밋하는 곳은 Phase 1 한 곳뿐이다.** 하네스 메타 라우트에는 Phase 1이 없고 주입 자체를 실행하지 않으므로, 그 라우트에서 `.codex/agents/*.toml`의 주입 블록이 커밋되는 경우는 존재하지 않는다.
 4. **감사 로그 기록 (Audit Logging)**
    - 각 페이즈가 시작하고 종료될 때마다 `.codex/_workspace/log/orchestrator-log.jsonl` 파일에 Append-only 방식으로 로그를 남긴다.
@@ -46,6 +46,13 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
        - ⛔ **단, 주입 명령이 애초에 실행되지 못한 경우에는 이 진단을 적용하지 마라.** Node가 없어 `exit 127`로 죽었다면 세션을 몇 번 재시작해도 지문은 생기지 않는다. Phase 0의 런타임 선행 검사를 건너뛰었는지 먼저 확인하고, 그렇다면 환경 문제로 보고한다.
    - 🚫 하위 에이전트가 주입 블록에 없는 프레임워크·도구·명령어를 사용하려 하면 즉시 중단시키고, 아키텍처를 갱신(➔ 재주입)하거나 사용자에게 질의한다.
    - 🚫 `system-architect`와 `release-manager`는 주입 대상이 아니다. 전자는 `design.md`의 **생산자**이므로 낡은 사본을 주입받으면 안 되고(이 역할만 `design.md`를 직접 읽고 쓴다), 후자는 스택 의존성이 없다.
+   - 🔹 **요구사항 시나리오 SSOT — `inject-scenario.mjs` (Phase 1 선행 스텝 전용):** `business-analyst`가 확정한 Gherkin 시나리오(`.codex/_workspace/00_scenario/scenario.feature`)는 위와 **별도의 주입기**로 `system-architect`·`issue-pm` 두 곳에만 정적 주입한다 (그 밖의 역할은 원래도 원본 요구사항을 보지 않으므로 대상이 아니다).
+     ```bash
+     node .codex/tools/inject-scenario.mjs
+     ```
+     - ⚠️ **`design.md`와 결정적으로 다른 점: 시나리오 부재는 차단 사유가 아니다.** `scenario.feature`가 없으면 `[NOT READY]` 블록이 주입되고, 대상 에이전트는 사용자 요구사항 컨텍스트나 `requirements.md`로 폴백한다 — BA 단계를 거치지 않는 경로(기존 코드베이스에 소규모 변경을 더하는 경우 등)에서 정상적으로 발생하는 상태다.
+     - **재주입 시점:** Phase 1 진입 시 `business-analyst`가 `scenario.feature`를 확정(`[SCENARIO READY]`)한 직후, `system-architect` 위임 **전**.
+     - **최신성 검증:** `node .codex/tools/inject-scenario.mjs --check`. `SCENARIO_FINGERPRINT` 불일치·`none` 반환 시의 진단은 위 `DESIGN_FINGERPRINT`와 동일하게 처리한다 (세션 재시작 요청, 단 Node 부재로 인한 실행 불가는 예외).
 6. **페이즈 인계 계약 (Phase Handoff Contract)**
    - 오케스트레이터 컨텍스트는 길어지면 요약(auto-compact)되거나 세션 재시작으로 사라진다. 페이즈 경계에서 다음 페이즈가 필요한 사실을 **파일로 남겨** 컨텍스트를 잃어도 인계가 끊기지 않게 한다. 컨텍스트를 잘라내는 것이 아니라 **잃어도 무해한 구조**를 만드는 것이 목적이다.
    - **경로:** `.codex/_workspace/handoff/phase-<N>.md` (N은 페이즈 번호. 같은 페이즈를 재실행하면 덮어쓴다.)
@@ -109,7 +116,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
     - ⛔ **대상 프로젝트의 `package.json`·`README.md`를 하네스 자산으로 오인하지 마라.** 같은 파일명이 문맥에 따라 성격이 다르다 — 하네스 저장소에서는 배포 자산이지만, 대상 프로젝트에서는 애플리케이션 매니페스트와 애플리케이션 문서다. 대상 프로젝트에서 의존성을 추가하는 작업을 하네스 메타로 분류하면 **주입이 생략되고 Track A 구현 에이전트도 스폰되지 않아**, 정상적인 개발이 설계 명세 없이 구현 역할 없이 진행된다.
     - 두 영역이 섞인 작업은 하네스 메타가 아니므로 아래 주입 절차를 정상 수행한다.
     - ⚖️ **애매하면 하네스 메타로 분류하지 않는다.** 오분류 비용이 비대칭이기 때문이다 — 하네스 메타를 일반 라우트로 잘못 보면 불필요한 주입이 한 번 도는 것으로 끝나지만, 반대 방향은 설계 명세 없이 개발이 진행된다.
-    - ⛔ **이 라우트에서는 `inject-design.mjs`를 실행하지 않는다.** 주입도, `--sections` 선행 검사도 건너뛴다. 하네스는 스택 무관이 설계 원칙이므로 하네스 자체를 손볼 때 `design.md` 부재는 결함이 아니라 정상 상태다. 그 상태에서 주입을 실행하면 추적 대상인 `.codex/agents/*.toml` 13개에 `[NOT READY]` 블록이 기록돼 작업트리만 오염된다. 주입할 명세도, 차단해야 할 스택 의존 작업도 없다.
+    - ⛔ **이 라우트에서는 `inject-design.mjs`를 실행하지 않는다.** 주입도, `--sections` 선행 검사도 건너뛴다. 하네스는 스택 무관이 설계 원칙이므로 하네스 자체를 손볼 때 `design.md` 부재는 결함이 아니라 정상 상태다. 그 상태에서 주입을 실행하면 추적 대상인 `.codex/agents/*.toml` 11개에 `[NOT READY]` 블록이 기록돼 작업트리만 오염된다. 주입할 명세도, 차단해야 할 스택 의존 작업도 없다.
     - Phase 3에서 Track A 구현 에이전트(`*-qa`·`*-developer`·`code-reviewer`)를 스폰하지 않는다. 수정 대상이 그 에이전트들의 정의 파일 자체여서 적용할 구현 역할이 없고, 이들은 주입 대상이므로 `<design_spec>` 없이 스폰해서는 안 된다. 오케스트레이터가 직접 편집하고 완료 조건은 이슈의 DoD로 검증한다.
     - 감사 로그의 `design_fingerprint`에는 `n/a (harness-meta)`를 기록한다.
 - ⭐️ **난이도 판별 (라우트 판별 직후, 런타임 검사보다 먼저 · Fast / Heavy):** 라우트가 **어느 페이즈를 도는가**를 정한다면, 난이도는 **그 페이즈를 얼마나 두껍게 도는가**를 정한다. 두 축은 직교하며 함께 확정한다.
@@ -142,7 +149,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
   ```
   - **실패(exit ≠ 0)하면 파이프라인을 즉시 중단**하고 사용자에게 Node 설치를 요청한다. 추측해서 진행하지 마라.
   - 최소 버전은 `package.json`의 `engines.node`와 일치시킨다 (현재 `>=16.7.0` — 스캐폴더가 쓰는 `fs.cpSync`의 도입 버전). 두 값이 어긋나면 안 되므로 `engines`를 바꿀 때 이 줄도 함께 갱신한다.
-  - ⛔ **하네스 메타 라우트도 예외가 아니다.** 이 라우트는 주입과 `--sections`를 건너뛰지만, Node는 여전히 필요하다 — Rule 3의 주입 블록 잔존 확인 폴백(`inject-design.mjs --clear`), 주입기 회귀 테스트(`node --test .codex/tools/inject-design.test.mjs`), 배포 오염 검사(`node bin/cli.mjs --preflight`)가 모두 Node로 실행된다. 생략되는 것은 주입·`--sections`뿐이고 런타임 검사는 아니다.
+  - ⛔ **하네스 메타 라우트도 예외가 아니다.** 이 라우트는 주입과 `--sections`를 건너뛰지만, Node는 여전히 필요하다 — Rule 3의 주입 블록 잔존 확인 폴백(`inject-design.mjs --clear`, `inject-scenario.mjs --clear`), 주입기 회귀 테스트(`node --test .codex/tools/inject-design.test.mjs`, `node --test .codex/tools/inject-scenario.test.mjs`), 배포 오염 검사(`node bin/cli.mjs --preflight`)가 모두 Node로 실행된다. 생략되는 것은 주입·`--sections`뿐이고 런타임 검사는 아니다.
   - 📌 **왜 주입보다 먼저인가:** Node가 없으면 주입 명령이 `exit 127`로 죽는데, 그 실패를 아래 `--sections`의 `exit 1`(섹션 미충족)과 혼동하면 "`design.md`가 불완전하다"로 오진해 `system-architect` 최소 호출 경로로 진입한다. 그 결과 **주입이 한 번도 성공하지 않은 상태로 에이전트를 스폰**하게 되고, 하위 에이전트는 `<design_spec>` 없이 스택을 추측하게 된다. 파이프라인이 멈추지 않고 잘못 진행되므로 명시적 실패보다 나쁘다. 검사를 앞에 두면 이 경로가 원천 차단된다.
 - ⭐️ **종료 코드 해석 (주입·검사 명령 공통):** `inject-design.mjs`와 `bin/cli.mjs`의 종료 코드를 아래대로 구분한다.
 
@@ -170,10 +177,15 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 - `orchestrator-log.jsonl`에 `INIT` 로그와 선택한 라우트명, 선택·생략한 페이즈, 근거, 그리고 `design_fingerprint`를 기록한다.
 
 ### Phase 1: 아키텍처 설계
+- ⭐️ **선행 스텝 — 요구사항 정제 (`business-analyst`, 조건부):** `system-architect`를 위임하기 **전에**, `.codex/_workspace/00_scenario/scenario.feature`가 아직 없거나 사용자 요청이 충분히 구체적이지 않다고 판단되면 `business-analyst` agent type을 서브 에이전트로 위임한다. 이미 스택 확정 목적의 **최소 범위 호출**(Phase 0의 "없거나 불완전한 경우" 경로)뿐이거나, 사용자 요청 자체가 이미 충분히 구체적이면 이 스텝을 생략하고 곧바로 `system-architect`를 위임한다.
+  - **라운드 루프:** 사용자 원 요청을 프롬프트에 실어 위임한다. 응답 첫 줄이 `[NEEDS INPUT]`이면 뒤따르는 질문 목록을 사용자에게 그대로 전달하고, 답변을 받으면 "원 요청 + 지금까지의 질문·답변 누적"을 다시 프롬프트에 실어 **동일 역할을 재위임**한다. `[SCENARIO READY]`가 나올 때까지 반복한다.
+  - ⛔ **BA는 사용자와 직접 대화하지 않는다.** Codex의 서브 에이전트는 오케스트레이터에게만 보고하는 허브-스포크 구조이므로, 질문 중계와 답변 수집은 오케스트레이터의 책임이다.
+  - 완료 즉시(또는 스텝을 생략했다면 그대로) `node .codex/tools/inject-scenario.mjs`를 실행하고 `--sections`로 최소 Gherkin 구조(Feature·Scenario·Given/When/Then)를 확인한다. `scenario.feature`가 없어도 `--sections`는 실패(exit 1)로 취급하지 않는다 — 이 페이즈를 막는 게이트는 **아니며**, `system-architect`·`issue-pm`은 `[NOT READY]` 블록을 받고 기존처럼 사용자 요구사항/`requirements.md`로 폴백한다.
+  - BA가 쓴 대화 히스토리(질문·답변 왕복)는 이 스텝이 끝나면 다음 페이즈로 넘기지 않는다. 남는 것은 `scenario.feature` 파일 하나뿐이다.
 - 전체 구축이거나 아키텍처 변경이 필요한 경우에만 `system-architect` agent type을 **서브 에이전트로 스폰**해 `design.md`를 산출한다. 단독 산출물 생산자이므로 위임은 이 한 번으로 끝나며 별도의 종료 시퀀스가 필요 없다.
 - ⭐️ **산출물 검수 (스크립트 위임):** `node .codex/tools/inject-design.mjs --sections`를 실행해 **기술 스택·디렉터리 구조 및 소유권·표준 명령어·계약 산출 형식·아키텍처 규약** 5개 섹션이 모두 채워졌는지 확인한다. exit 1이면 다음 페이즈로 진행하지 않고, 스크립트가 지목한 미충족 섹션만 아키텍트에게 보완 지시한다. 여기서도 `design.md` 전문을 열지 않는다.
 - ⭐️ **[필수] 재주입:** 검수 통과 즉시 `node .codex/tools/inject-design.mjs`를 다시 실행하여 확정된 설계를 하위 에이전트의 시스템 프롬프트에 반영하고, 새 `fingerprint`를 기준 지문으로 갱신한다. **이 단계를 건너뛰면 Phase 2 이후 전원이 낡거나 비어 있는 명세로 작업하게 된다.**
-- ⭐️ **[마이크로 커밋]** 완료 후 `git commit -m "docs(architecture): 시스템 설계 완료"` 실행. 주입으로 변경된 `.codex/agents/*.toml`도 같은 커밋에 포함한다. **이 지시는 Phase 1을 수행하는 라우트에만 적용된다** — 하네스 메타 라우트는 Phase 1도, 주입도 실행하지 않는다. 커밋 직전에 Rule 6의 인계 파일 `handoff/phase-1.md`를 기록한다.
+- ⭐️ **[마이크로 커밋]** 완료 후 `git commit -m "docs(architecture): 시스템 설계 완료"` 실행. 주입으로 변경된 `.codex/agents/*.toml`과, BA 선행 스텝을 수행했다면 `scenario.feature`도 같은 커밋에 포함한다. **이 지시는 Phase 1을 수행하는 라우트에만 적용된다** — 하네스 메타 라우트는 Phase 1도, 주입도 실행하지 않는다. 커밋 직전에 Rule 6의 인계 파일 `handoff/phase-1.md`를 기록한다.
 
 ### Phase 2: 티켓팅 및 브랜치 파생 (Sub-agent)
 - 필요한 역할만 서브 에이전트로 위임한다. 신규 티켓이 필요하면 `issue-pm` agent type, 계약이 필요하면 `tech-leader` agent type을 명시한다.
@@ -255,6 +267,24 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 - 주입 블록은 자동 생성 영역이다. `.codex/agents/*.toml`의 `developer_instructions` 안 `<!-- DESIGN_SPEC:BEGIN -->` ~ `<!-- DESIGN_SPEC:END -->` 구간을 손으로 편집하지 않는다.
 - 🧪 **회귀 테스트:** `node --test .codex/tools/inject-design.test.mjs`. 위 표의 모드별 계약과 줄바꿈 보존·멱등성·블록 위치·`TARGETS` 구성을 고정한다. 임시 디렉터리에 픽스처 저장소를 만들어 실행하므로 실제 `.codex/agents/*.toml`과 `design.md`를 건드리지 않는다. `node --test`는 점으로 시작하는 디렉터리를 탐색하지 않으니 디렉터리가 아니라 **파일 경로를 직접** 지정한다.
 - 스크립트의 동작을 바꿀 때는 위 테스트를 함께 갱신한다. 테스트가 실패한 상태로 파이프라인을 진행하지 마라.
+
+## 🔧 주입 스크립트 레퍼런스 (`.codex/tools/inject-scenario.mjs`)
+
+`inject-design.mjs`와 같은 인터페이스이지만 대상은 `scenario.feature`이고, 대상 에이전트는 `system-architect`·`issue-pm` 두 곳뿐이며, 파일 부재가 실패로 취급되지 않는다.
+
+| 명령 | 용도 |
+|---|---|
+| `node .codex/tools/inject-scenario.mjs` | `scenario.feature` 전문을 `system-architect`·`issue-pm` 시스템 프롬프트에 주입/갱신 (멱등) |
+| `node .codex/tools/inject-scenario.mjs --check` | 주입 최신성 검증만 수행. 드리프트가 있으면 exit 1 |
+| `node .codex/tools/inject-scenario.mjs --json` | 결과를 JSON으로 출력 (`fingerprint`, `scenarioReady`, 에이전트별 상태) |
+| `node .codex/tools/inject-scenario.mjs --sections` | 최소 Gherkin 구조(Feature 1개 이상·Scenario 1개 이상·Given/When/Then 2줄 이상)만 검사. 미충족 시 exit 1 |
+| `node .codex/tools/inject-scenario.mjs --dry-run` | 파일을 쓰지 않고 결과만 확인 |
+| `node .codex/tools/inject-scenario.mjs --clear` | 주입 블록을 제거하고 하네스 원본 상태로 복원 |
+
+- ⚠️ **`design.md`와의 결정적 차이:** `scenario.feature`가 없어도 `inject-scenario.mjs`(플래그 없는 기본 실행)는 exit 0이다. `[NOT READY]` 블록을 주입할 뿐 파이프라인을 막지 않는다. **`--sections`만 예외적으로 파일이 없으면 exit 1**을 낸다 — BA를 실제로 호출했는지 오케스트레이터가 확인할 때만 쓰고, BA 스텝을 생략한 경로에서는 애초에 `--sections`를 실행하지 않는다.
+- 주입 블록은 자동 생성 영역이다. `.codex/agents/*.toml`의 `developer_instructions` 안 `<!-- SCENARIO_SPEC:BEGIN -->` ~ `<!-- SCENARIO_SPEC:END -->` 구간을 손으로 편집하지 않는다.
+- 🧪 **회귀 테스트:** `node --test .codex/tools/inject-scenario.test.mjs`.
+- 스크립트의 동작을 바꿀 때는 위 테스트를 함께 갱신한다.
 
 ---
 
