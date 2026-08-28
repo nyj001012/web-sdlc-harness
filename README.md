@@ -2,7 +2,7 @@
 
 Claude Code와 Codex CLI 양쪽에서 쓸 수 있는 하네스 (풀스택 웹 개발)
 
-12개의 에이전트 페르소나와 13개의 스킬로 구성된, **애자일 SDLC 전체를 자동으로 굴리는 하네스**다. 요구사항 분석 ➔ 아키텍처 설계 ➔ 티켓팅 ➔ TDD 병렬 개발 ➔ E2E 검증 ➔ PR 생성 ➔ 문서화까지를 페이즈별 에이전트 팀으로 나눠 수행한다.
+14개의 에이전트 페르소나와 13개의 스킬로 구성된, **애자일 SDLC 전체를 자동으로 굴리는 하네스**다. 요구사항 분석 ➔ 아키텍처 설계 ➔ 티켓팅 ➔ TDD 병렬 개발 ➔ E2E 검증 ➔ PR 생성 ➔ 문서화까지를 페이즈별 에이전트 팀으로 나눠 수행한다.
 
 패키지는 두 벌의 소스 트리를 담고 있다 — `.claude/`(Claude Code용, Phase 3 Track A에서 에이전트 팀 모드·P2P 통신 사용)와 `.codex/`(Codex CLI용, Codex의 서브에이전트가 오케스트레이터에게만 보고하는 허브-스포크 구조라 P2P 대신 순차 위임 사용). 라우팅·페이즈 골격은 같지만 실행 방식이 다르므로 설치 시 호스트를 고른다(「설치」 참고).
 
@@ -133,6 +133,8 @@ node .claude/tools/inject-design.mjs --clear    # 주입 블록 제거, 하네�
 - **주입 제외:** `system-architect`(`design.md`의 생산자이므로 낡은 사본 주입 금지)와 `release-manager`(스택 의존성 없음).
 - 주입 블록은 자동 생성 영역이다. `<!-- DESIGN_SPEC:BEGIN -->` ~ `<!-- DESIGN_SPEC:END -->` 구간을 손으로 편집하지 않는다.
 
+같은 방식으로, `business-analyst`가 사용자와 요구사항을 정제해 확정한 Gherkin 시나리오(`scenario.feature`)도 형제 스크립트 `inject-scenario.mjs`가 `system-architect`·`issue-pm` 두 곳에만 정적 주입한다 — 단, `design.md`와 달리 시나리오 부재는 파이프라인을 막지 않고 기존 `requirements.md` 경로로 조용히 폴백한다.
+
 ## 🚀 에이전트 오케스트레이션 파이프라인 (Pipeline Architecture)
 
 `run_web_sdlc` 스킬이 마스터 오케스트레이터로서 페이즈를 동적 라우팅한다. 오케스트레이터를 중심에 둔 **스타(hub-and-spoke) 위상**이며, 서브 에이전트는 스폰 ➔ 작업 ➔ 최종 보고 ➔ 종료하고 역할 간 전달은 오케스트레이터가 중계한다. 이 하네스는 진입 단계(Phase 0)의 검증 결과에 따라 **Fast**와 **Heavy** 두 가지 트랙으로 분기하여 에이전트를 구동한다.
@@ -144,7 +146,8 @@ node .claude/tools/inject-design.mjs --clear    # 주입 블록 제거, 하네�
 %%{init: {'theme': 'neutral', 'config': {'useMaxWidth': true}}}%%
 graph TD
     P0[Phase 0: 진입 검사] -->|Fast 트랙| P2_F[Phase 2: Fast PM]
-    P0 -->|Heavy 트랙| P1[Phase 1: 아키텍트 SSOT]
+    P0 -->|Heavy 트랙| P1_BA[Phase 1 선행: BA 요구사항 정제]
+    P1_BA --> P1[Phase 1: 아키텍트 SSOT]
 
     %% Fast Track
     P2_F --> P3_F[Phase 3: Fast 구현 & 리뷰]
@@ -166,7 +169,7 @@ graph TD
 | Phase | 하는 일 | 투입 에이전트 |
 |---|---|---|
 | **0** | 컨텍스트 분석 · 라우팅 · **난이도 판별** · **설계 명세 주입** · 스택 확보 선행 검사 | (오케스트레이터) |
-| **1** | 아키텍처 및 기술 스택 확정 | `system-architect` |
+| **1** | (선행, 조건부) 요구사항 정제 · Gherkin 시나리오 확정<br>아키텍처 및 기술 스택 확정 | `business-analyst`(조건부), `system-architect` |
 | **2** | 이슈 생성 · 작업 브랜치 파생 · 인터페이스 계약 설계 | `issue-pm`, `tech-leader` |
 | **3** | Track A: TDD 병렬 개발 (테스트 선행 → 구현 → 리뷰 핑퐁)<br>Track B: 인프라 · CI/CD | `backend-qa`, `backend-developer`, `db-engineer`, `frontend-qa`, `frontend-developer`, `code-reviewer`, `devops-engineer` |
 | **4** | 실행 환경에서 사용자 시나리오 통합 검증 · **에러 로그 트리아지** | `e2e-tester` |
@@ -327,7 +330,9 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 
 tools/                             # 어느 호스트에도 속하지 않는 유일한 원본. 설치 시 두 호스트 각자의 tools/로 복사된다
 ├── inject-design.mjs              # design.md ➔ 에이전트 시스템 프롬프트 정적 주입기
-└── inject-design.test.mjs         # 주입기 회귀 테스트 (node --test)
+├── inject-design.test.mjs         # 주입기 회귀 테스트 (node --test)
+├── inject-scenario.mjs            # scenario.feature ➔ system-architect·issue-pm 정적 주입기 (BA 산출물, 부재는 비차단)
+└── inject-scenario.test.mjs       # 시나리오 주입기 회귀 테스트 (node --test)
 
 (설치되는 두 호스트 — 설치 옵션에 따라 한쪽 또는 둘 다)
 .claude/{agents,skills,tools}/     # Claude Code용(Markdown+YAML). Track A에 P2P 팀 모드 사용. tools/는 위 원본의 사본
@@ -337,6 +342,7 @@ tools/                             # 어느 호스트에도 속하지 않는 유
 <호스트>/_workspace/                 # 설치한 호스트(.claude 또는 .codex) 밑에 독립적으로 생긴다
 │
 ├── (추적) 합의물 — 커밋 대상
+│   ├── 00_scenario/scenario.feature # BA가 확정한 Gherkin 요구사항 (조건부 — BA 단계를 거를 수도 있다)
 │   ├── 01_architecture/design.md  # 기술 스택·규약·소유권 (그 호스트의 SSOT)
 │   ├── 03_contracts/              # 인터페이스 계약 (형식은 design.md가 정함)
 │   └── 04_infrastructure/         # 설치·배포 스크립트

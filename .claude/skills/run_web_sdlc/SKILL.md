@@ -14,7 +14,7 @@ allowed-tools:
 
 # Skill: Master Orchestrator Pipeline
 
-이 스킬은 13개의 에이전트 페르소나를 페이즈(Phase)별로 동적 라우팅하여 스폰하고, 공유 작업 목록(Task)과 직접 통신(P2P)을 통해 작업을 조율한 뒤 안전하게 해체하는 마스터 지휘소다.
+이 스킬은 14개의 에이전트 페르소나를 페이즈(Phase)별로 동적 라우팅하여 스폰하고, 공유 작업 목록(Task)과 직접 통신(P2P)을 통해 작업을 조율한 뒤 안전하게 해체하는 마스터 지휘소다.
 
 ## 📌 Orchestration Rules (절대 준수 규칙)
 
@@ -32,7 +32,7 @@ allowed-tools:
    - 각 Phase나 개발 트랙 종료 시 활성 teammate 각각에게 이름으로 `shutdown_request`를 전송하고, 파일 I/O 완료와 종료 승인을 모두 확인한다. **이 시퀀스는 팀 모드 teammate(Phase 3 Track A)에게만 적용된다** — 서브 에이전트는 임무를 마치면 스스로 종료되므로 대상이 아니다.
    - **그 다음, Rule 6의 페이즈 인계 파일(`.claude/_workspace/handoff/phase-<N>.md`)을 기록한다.** 다음 페이즈가 필요한 사실을 파일에 먼저 남긴 뒤 커밋해야, 컨텍스트가 요약되거나 세션이 끊겨도 인계가 끊기지 않는다.
    - **그 뒤에, 오케스트레이터가 직접 `Bash` 도구를 사용하여 해당 Phase의 변경만 스테이징하고 `git commit -m "feat(Phase N): [작업명] 완료"` 형식으로 스냅샷을 저장한다.**
-   - ⛔ **스테이징 전 주입 블록 잔존 확인:** `git status --porcelain`으로 이번 페이즈의 작업 대상이 아닌 `.claude/agents/*.md`가 수정 목록에 올라와 있는지 확인한다. 주입 블록만 다른 변경이라면 `node .claude/tools/inject-design.mjs --clear`로 복원한 뒤 스테이징한다. `git add -A`나 `git add .claude/`처럼 범위를 넓히는 스테이징을 하지 마라.
+   - ⛔ **스테이징 전 주입 블록 잔존 확인:** `git status --porcelain`으로 이번 페이즈의 작업 대상이 아닌 `.claude/agents/*.md`가 수정 목록에 올라와 있는지 확인한다. 주입 블록만 다른 변경이라면 `node .claude/tools/inject-design.mjs --clear`와 `node .claude/tools/inject-scenario.mjs --clear`로 복원한 뒤 스테이징한다. `git add -A`나 `git add .claude/`처럼 범위를 넓히는 스테이징을 하지 마라.
    - 📌 **주입 결과를 의도적으로 커밋하는 곳은 Phase 1 한 곳뿐이다.** 하네스 메타 라우트에는 Phase 1이 없고 주입 자체를 실행하지 않으므로, 그 라우트에서 `.claude/agents/*.md`의 주입 블록이 커밋되는 경우는 존재하지 않는다.
    - 별도 팀 삭제 도구는 사용하지 않는다. 공유 팀 리소스는 세션 종료 시 자동 정리된다.
 4. **감사 로그 기록 (Audit Logging)**
@@ -56,6 +56,13 @@ allowed-tools:
        - ⛔ **단, 주입 명령이 애초에 실행되지 못한 경우에는 이 진단을 적용하지 마라.** Node가 없어 `exit 127`로 죽었다면 세션을 몇 번 재시작해도 지문은 생기지 않는다. Phase 0의 런타임 선행 검사를 건너뛰었는지 먼저 확인하고, 그렇다면 환경 문제로 보고한다.
    - 🚫 하위 에이전트가 주입 블록에 없는 프레임워크·도구·명령어를 사용하려 하면 즉시 중단시키고, 아키텍처를 갱신(➔ 재주입)하거나 사용자에게 질의한다.
    - 🚫 `system-architect`와 `release-manager`는 주입 대상이 아니다. 전자는 `design.md`의 **생산자**이므로 낡은 사본을 주입받으면 안 되고(이 역할만 `design.md`를 직접 읽고 쓴다), 후자는 스택 의존성이 없다.
+   - 🔹 **요구사항 시나리오 SSOT — `inject-scenario.mjs` (Phase 1 선행 스텝 전용):** `business-analyst`가 확정한 Gherkin 시나리오(`.claude/_workspace/00_scenario/scenario.feature`)는 위와 **별도의 주입기**로 `system-architect`·`issue-pm` 두 곳에만 정적 주입한다 (그 밖의 에이전트는 원래도 원본 요구사항을 보지 않으므로 대상이 아니다).
+     ```bash
+     node .claude/tools/inject-scenario.mjs
+     ```
+     - ⚠️ **`design.md`와 결정적으로 다른 점: 시나리오 부재는 차단 사유가 아니다.** `scenario.feature`가 없으면 `[NOT READY]` 블록이 주입되고, 대상 에이전트는 사용자 요구사항 컨텍스트나 `requirements.md`로 폴백한다 — BA 단계를 거치지 않는 경로(기존 코드베이스에 소규모 변경을 더하는 경우 등)에서 정상적으로 발생하는 상태다.
+     - **재주입 시점:** Phase 1 진입 시 `business-analyst`가 `scenario.feature`를 확정(`[SCENARIO READY]`)한 직후, `system-architect` 스폰 **전**.
+     - **최신성 검증:** `node .claude/tools/inject-scenario.mjs --check`. `SCENARIO_FINGERPRINT` 불일치·`none` 반환 시의 진단은 위 `DESIGN_FINGERPRINT`와 동일하게 처리한다 (세션 재시작 요청, 단 Node 부재로 인한 실행 불가는 예외).
 6. **페이즈 인계 계약 (Phase Handoff Contract)**
    - 오케스트레이터 컨텍스트는 길어지면 요약(auto-compact)되거나 세션 재시작으로 사라진다. 페이즈 경계에서 다음 페이즈가 필요한 사실을 **파일로 남겨** 컨텍스트를 잃어도 인계가 끊기지 않게 한다. 컨텍스트를 잘라내는 것이 아니라 **잃어도 무해한 구조**를 만드는 것이 목적이다.
    - **경로:** `.claude/_workspace/handoff/phase-<N>.md` (N은 페이즈 번호. 같은 페이즈를 재실행하면 덮어쓴다.)
@@ -152,7 +159,7 @@ allowed-tools:
   ```
   - **실패(exit ≠ 0)하면 파이프라인을 즉시 중단**하고 사용자에게 Node 설치를 요청한다. 추측해서 진행하지 마라.
   - 최소 버전은 `package.json`의 `engines.node`와 일치시킨다 (현재 `>=16.7.0` — 스캐폴더가 쓰는 `fs.cpSync`의 도입 버전). 두 값이 어긋나면 안 되므로 `engines`를 바꿀 때 이 줄도 함께 갱신한다.
-  - ⛔ **하네스 메타 라우트도 예외가 아니다.** 이 라우트는 주입과 `--sections`를 건너뛰지만, Node는 여전히 필요하다 — Rule 3의 주입 블록 잔존 확인 폴백(`inject-design.mjs --clear`), 주입기 회귀 테스트(`node --test .claude/tools/inject-design.test.mjs`), 배포 오염 검사(`node bin/cli.mjs --preflight`)가 모두 Node로 실행된다. 생략되는 것은 주입·`--sections`뿐이고 런타임 검사는 아니다.
+  - ⛔ **하네스 메타 라우트도 예외가 아니다.** 이 라우트는 주입과 `--sections`를 건너뛰지만, Node는 여전히 필요하다 — Rule 3의 주입 블록 잔존 확인 폴백(`inject-design.mjs --clear`, `inject-scenario.mjs --clear`), 주입기 회귀 테스트(`node --test .claude/tools/inject-design.test.mjs`, `node --test .claude/tools/inject-scenario.test.mjs`), 배포 오염 검사(`node bin/cli.mjs --preflight`)가 모두 Node로 실행된다. 생략되는 것은 주입·`--sections`뿐이고 런타임 검사는 아니다.
   - 📌 **왜 주입보다 먼저인가:** Node가 없으면 주입 명령이 `exit 127`로 죽는데, 그 실패를 아래 `--sections`의 `exit 1`(섹션 미충족)과 혼동하면 "`design.md`가 불완전하다"로 오진해 `system-architect` 최소 호출 경로로 진입한다. 그 결과 **주입이 한 번도 성공하지 않은 상태로 에이전트를 스폰**하게 되고, 하위 에이전트는 `<design_spec>` 없이 스택을 추측하게 된다. 파이프라인이 멈추지 않고 잘못 진행되므로 명시적 실패보다 나쁘다. 검사를 앞에 두면 이 경로가 원천 차단된다.
 - ⭐️ **종료 코드 해석 (주입·검사 명령 공통):** `inject-design.mjs`와 `bin/cli.mjs`의 종료 코드를 아래대로 구분한다.
 
@@ -180,10 +187,15 @@ allowed-tools:
 - `orchestrator-log.jsonl`에 `INIT` 로그와 선택한 라우트명, 선택·생략한 페이즈, 근거, 그리고 `design_fingerprint`를 기록한다.
 
 ### Phase 1: 아키텍처 설계
+- ⭐️ **선행 스텝 — 요구사항 정제 (`business-analyst`, 조건부):** `system-architect`를 스폰하기 **전에**, `.claude/_workspace/00_scenario/scenario.feature`가 아직 없거나 사용자 요청이 충분히 구체적이지 않다고 판단되면 `business-analyst` agent type을 서브 에이전트로 스폰한다. 이미 스택 확정 목적의 **최소 범위 호출**(Phase 0의 "없거나 불완전한 경우" 경로)뿐이거나, 사용자 요청 자체가 이미 충분히 구체적이면 이 스텝을 생략하고 곧바로 `system-architect`를 스폰한다.
+  - **라운드 루프:** 사용자 원 요청을 프롬프트에 실어 스폰한다. 응답 첫 줄이 `[NEEDS INPUT]`이면 뒤따르는 질문 목록을 사용자에게 그대로 전달(대화 또는 `AskUserQuestion`)하고, 답변을 받으면 "원 요청 + 지금까지의 질문·답변 누적"을 다시 프롬프트에 실어 **동일 역할을 재스폰**한다. `[SCENARIO READY]`가 나올 때까지 반복한다.
+  - ⛔ **BA는 사용자와 직접 대화하지 않는다.** 서브 에이전트는 오케스트레이터에게만 보고하므로, 질문 중계와 답변 수집은 오케스트레이터의 책임이다.
+  - 완료 즉시(또는 스텝을 생략했다면 그대로) `node .claude/tools/inject-scenario.mjs`를 실행하고 `--sections`로 최소 Gherkin 구조(Feature·Scenario·Given/When/Then)를 확인한다. `scenario.feature`가 없어도 `--sections`는 실패(exit 1)로 취급하지 않는다 — 이 페이즈를 막는 게이트는 **아니며**, `system-architect`·`issue-pm`은 `[NOT READY]` 블록을 받고 기존처럼 사용자 요구사항/`requirements.md`로 폴백한다. `--sections`는 "BA를 실제로 돌렸다면 그 산출물이 온전한가"만 확인하는 용도다.
+  - BA가 쓴 대화 히스토리(질문·답변 왕복)는 이 스텝이 끝나면 다음 페이즈로 넘기지 않는다. 남는 것은 `scenario.feature` 파일 하나뿐이다.
 - 전체 구축이거나 아키텍처 변경이 필요한 경우에만 `system-architect` agent type을 **서브 에이전트로 스폰**해 `design.md`를 산출한다. 단독 산출물 생산자이며 P2P 상대가 없으므로 팀 모드로 두지 않는다 (Rule 1). 따라서 이 페이즈에는 shutdown 시퀀스가 없다.
 - ⭐️ **산출물 검수 (스크립트 위임):** `node .claude/tools/inject-design.mjs --sections`를 실행해 **기술 스택·디렉터리 구조 및 소유권·표준 명령어·계약 산출 형식·아키텍처 규약** 5개 섹션이 모두 채워졌는지 확인한다. exit 1이면 다음 페이즈로 진행하지 않고, 스크립트가 지목한 미충족 섹션만 아키텍트에게 보완 지시한다. 여기서도 `design.md` 전문을 열지 않는다.
 - ⭐️ **[필수] 재주입:** 검수 통과 즉시 `node .claude/tools/inject-design.mjs`를 다시 실행하여 확정된 설계를 하위 에이전트의 시스템 프롬프트에 반영하고, 새 `fingerprint`를 기준 지문으로 갱신한다. **이 단계를 건너뛰면 Phase 2 이후 전원이 낡거나 비어 있는 명세로 작업하게 된다.**
-- ⭐️ **[마이크로 커밋]** 완료 후 `git commit -m "docs(architecture): 시스템 설계 완료"` 실행. 주입으로 변경된 `.claude/agents/*.md`도 같은 커밋에 포함한다. **이 지시는 Phase 1을 수행하는 라우트에만 적용된다** — 하네스 메타 라우트는 Phase 1도, 주입도 실행하지 않는다. 커밋 직전에 Rule 6의 인계 파일 `handoff/phase-1.md`를 기록한다.
+- ⭐️ **[마이크로 커밋]** 완료 후 `git commit -m "docs(architecture): 시스템 설계 완료"` 실행. 주입으로 변경된 `.claude/agents/*.md`와, BA 선행 스텝을 수행했다면 `scenario.feature`도 같은 커밋에 포함한다. **이 지시는 Phase 1을 수행하는 라우트에만 적용된다** — 하네스 메타 라우트는 Phase 1도, 주입도 실행하지 않는다. 커밋 직전에 Rule 6의 인계 파일 `handoff/phase-1.md`를 기록한다.
 
 ### Phase 2: 티켓팅 및 브랜치 파생 (Sub-agent)
 - 필요한 역할만 `Agent`로 호출한다. 신규 티켓이 필요하면 `issue-pm` agent type, 계약이 필요하면 `tech-leader` agent type을 명시한다.
@@ -255,6 +267,24 @@ allowed-tools:
 - 주입 블록은 자동 생성 영역이다. `.claude/agents/*.md`의 `<!-- DESIGN_SPEC:BEGIN -->` ~ `<!-- DESIGN_SPEC:END -->` 구간을 손으로 편집하지 않는다.
 - 🧪 **회귀 테스트:** `node --test .claude/tools/inject-design.test.mjs`. 위 표의 모드별 계약과 줄바꿈 보존·멱등성·블록 위치·`TARGETS` 구성을 고정한다. 임시 디렉터리에 픽스처 저장소를 만들어 실행하므로 실제 `.claude/agents/*.md`와 `design.md`를 건드리지 않는다. `node --test`는 점으로 시작하는 디렉터리를 탐색하지 않으니 디렉터리가 아니라 **파일 경로를 직접** 지정한다.
 - 스크립트의 동작을 바꿀 때는 위 테스트를 함께 갱신한다. 테스트가 실패한 상태로 파이프라인을 진행하지 마라.
+
+## 🔧 주입 스크립트 레퍼런스 (`.claude/tools/inject-scenario.mjs`)
+
+`inject-design.mjs`와 같은 인터페이스이지만 대상은 `scenario.feature`이고, 대상 에이전트는 `system-architect`·`issue-pm` 두 곳뿐이며, 파일 부재가 실패로 취급되지 않는다.
+
+| 명령 | 용도 |
+|---|---|
+| `node .claude/tools/inject-scenario.mjs` | `scenario.feature` 전문을 `system-architect`·`issue-pm` 시스템 프롬프트에 주입/갱신 (멱등) |
+| `node .claude/tools/inject-scenario.mjs --check` | 주입 최신성 검증만 수행. 드리프트가 있으면 exit 1 |
+| `node .claude/tools/inject-scenario.mjs --json` | 결과를 JSON으로 출력 (`fingerprint`, `scenarioReady`, 에이전트별 상태) |
+| `node .claude/tools/inject-scenario.mjs --sections` | 최소 Gherkin 구조(Feature 1개 이상·Scenario 1개 이상·Given/When/Then 2줄 이상)만 검사. 미충족 시 exit 1 |
+| `node .claude/tools/inject-scenario.mjs --dry-run` | 파일을 쓰지 않고 결과만 확인 |
+| `node .claude/tools/inject-scenario.mjs --clear` | 주입 블록을 제거하고 하네스 원본 상태로 복원 |
+
+- ⚠️ **`design.md`와의 결정적 차이:** `scenario.feature`가 없어도 `inject-scenario.mjs`(플래그 없는 기본 실행)는 exit 0이다. `[NOT READY]` 블록을 주입할 뿐 파이프라인을 막지 않는다. **`--sections`만 예외적으로 파일이 없으면 exit 1**을 낸다 — BA를 실제로 호출했는지 오케스트레이터가 확인할 때만 쓰고, BA 스텝을 생략한 경로에서는 애초에 `--sections`를 실행하지 않는다.
+- 주입 블록은 자동 생성 영역이다. `.claude/agents/*.md`의 `<!-- SCENARIO_SPEC:BEGIN -->` ~ `<!-- SCENARIO_SPEC:END -->` 구간을 손으로 편집하지 않는다.
+- 🧪 **회귀 테스트:** `node --test .claude/tools/inject-scenario.test.mjs`.
+- 스크립트의 동작을 바꿀 때는 위 테스트를 함께 갱신한다.
 
 ---
 
