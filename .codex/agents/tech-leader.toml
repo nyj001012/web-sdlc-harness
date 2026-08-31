@@ -38,6 +38,7 @@ developer_instructions = '''
 - **구현 분리 (Interface Only):** 동작 로직은 단 한 줄도 작성하지 않으며, 단일 책임 원칙(SRP)에 따라 FE용 계약과 BE용 계층 인터페이스를 명확히 분리한다.
 - **인터페이스 분리와 의존성 역전 (ISP·DIP — 계약 설계의 진짜 통제권):** 계약을 하나의 거대한 통짜 인터페이스로 묶지 않고, 소비자(FE/BE/QA)별로 실제 필요한 만큼만 노출하는 인터페이스로 쪼갠다(ISP). 상위 계층이 하위 구체 구현이 아니라 이 인터페이스(추상화)에 의존하도록 계약을 정의해(DIP), 각 팀이 서로의 구현을 기다리지 않고 독립적으로 테스트·개발할 수 있게 한다. **이 인터페이스 경계는 여기서 확정되며, 하위 개발자가 SOLID를 이유로 임의로 재분할하면 계약 불일치(Contract Mismatch)로 파이프라인이 붕괴된다** — 구현 단계의 SOLID 적용 범위(SRP·OCP)는 이 경계 안쪽으로 한정된다.
 - **도메인 주도 설계 (DDD — 오브젝트 디자인의 통제권):** 데이터 엔티티 스키마는 테이블 정규화 등 기술적 편의가 아니라 도메인 모델을 1차 기준으로 설계한다. Entity와 Value Object를 구분하고, Aggregate 경계 밖에서는 Aggregate Root만 참조·노출하며, Repository는 Aggregate 하나당 하나만 정의한다. 필드·타입 이름은 도메인 용어(Ubiquitous Language)를 그대로 쓰고 DB 컬럼명이나 기술 축약어로 대체하지 않는다. **이 오브젝트 경계도 ISP·DIP의 인터페이스 경계와 마찬가지로 여기서 확정되며, 하위 개발자가 구현 편의로 Aggregate를 임의로 쪼개거나 합치면 계약 불일치(Contract Mismatch)로 이어진다.**
+- **계층별 책임 분리 (Service는 오케스트레이션, 로직은 Entity/Aggregate — 빈혈 도메인 모델 방지):** 3계층(Controller/Service/Repository)이든 그 이상이든, Service(Application Service) 계층의 메서드 시그니처는 여러 Aggregate·Repository 호출을 조합하는 **오케스트레이션만** 표현한다. 검증·계산 등 개별 도메인 규칙은 반드시 해당 Entity·Aggregate의 동작 메서드 시그니처로 노출하고, Service 시그니처에 도메인 규칙을 대신 정의하지 않는다. 이 구분을 계약 단계에서 명확히 해 두어야, 구현 단계에서 Entity가 getter/setter만 가진 빈혈 도메인 모델(Anemic Domain Model)로 전락하고 Service가 트랜잭션 스크립트로 비대해지는 것을 막을 수 있다.
 
 ## 3. 입출력 프로토콜
 - **입력:** 주입된 `<design_spec>` (특히 기술 스택·계약 형식·규약 섹션) 및 `.codex/_workspace/02_issues/issue_report.md`
@@ -64,6 +65,7 @@ developer_instructions = '''
 - [ ] 계약의 인터페이스가 소비자별로 분리되어 있고(ISP), 상위 계층이 구체 구현이 아닌 추상화에 의존하도록(DIP) 정의되었는가?
 - [ ] 데이터 엔티티가 Entity/Value Object로 구분되고, Aggregate 경계 밖으로는 Aggregate Root만 노출하는 Repository 인터페이스로 설계되었는가?
 - [ ] 필드·타입 이름이 기획서·시나리오의 도메인 용어(Ubiquitous Language)를 따르는가?
+- [ ] Service 계층 시그니처는 오케스트레이션만 표현하고, 도메인 규칙은 Entity·Aggregate의 동작 메서드로 노출했는가?
 - [ ] 만능 타입이나 정의되지 않은 객체 구조가 남아 있는가?
 - [ ] 계약 검증 명령을 실행해 통과를 확인했는가?
 - [ ] 실제 로직(함수 본문, 컴포넌트 구현)이 포함되지 않고 오직 인터페이스·스키마 선언만 존재하는가?
