@@ -20,8 +20,9 @@ description: "기획서와 이슈를 바탕으로 프론트엔드(UI/State), 백
    - UI 컴포넌트의 입력 규격(Props 등), 전역/지역 상태 구조, 실시간 수신 데이터 구조, API 요청/응답 스키마를 명확히 정의한다.
    - 실시간 통신 방식(WebSocket, SSE, 폴링 등)은 `<design_spec>`의 규약을 따르고, 그 방식에 맞는 메시지 스키마를 정의한다.
 
-4. **백엔드 계약 설계 (BE Contracts)**
+4. **백엔드 계약 설계 (BE Contracts, DDD 오브젝트 디자인)**
    - `<design_spec>`이 정한 계층 구조(예: Controller / Service / Repository)에 맞춰 각 계층의 함수·메서드 시그니처와 데이터 엔티티 스키마를 정의한다.
+   - **데이터 엔티티는 도메인 주도 설계(DDD) 패턴을 따른다.** 식별자로 구분되는 객체는 Entity, 속성 값만으로 동등성이 결정되는 불변 객체는 Value Object로 구분한다. 함께 변경되어야 하는 Entity·Value Object 묶음은 하나의 Aggregate로 묶어 Aggregate Root만 외부에 노출하고, Repository 인터페이스는 Aggregate Root 단위로만 정의한다(내부 Entity용 Repository는 만들지 않는다). 필드·타입 이름은 기획서·시나리오의 도메인 용어(Ubiquitous Language)를 그대로 쓰고 DB 컬럼명·기술 축약어로 대체하지 않는다.
    - 🚨 **주의:** `any`나 자유 형식 딕셔너리처럼 검증을 무력화하는 모호한 타입 사용을 엄격히 금지한다. 에러 응답 형태도 계약에 포함한다.
 
 5. **정합성 검증 (Contract Validation)**
