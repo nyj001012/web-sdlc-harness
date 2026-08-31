@@ -56,7 +56,7 @@ allowed-tools:
        - ⛔ **단, 주입 명령이 애초에 실행되지 못한 경우에는 이 진단을 적용하지 마라.** Node가 없어 `exit 127`로 죽었다면 세션을 몇 번 재시작해도 지문은 생기지 않는다. Phase 0의 런타임 선행 검사를 건너뛰었는지 먼저 확인하고, 그렇다면 환경 문제로 보고한다.
    - 🚫 하위 에이전트가 주입 블록에 없는 프레임워크·도구·명령어를 사용하려 하면 즉시 중단시키고, 아키텍처를 갱신(➔ 재주입)하거나 사용자에게 질의한다.
    - 🚫 `system-architect`와 `release-manager`는 주입 대상이 아니다. 전자는 `design.md`의 **생산자**이므로 낡은 사본을 주입받으면 안 되고(이 역할만 `design.md`를 직접 읽고 쓴다), 후자는 스택 의존성이 없다.
-   - 🔹 **요구사항 시나리오 SSOT — `inject-scenario.mjs` (Phase 1 선행 스텝 전용):** `business-analyst`가 확정한 Gherkin 시나리오(`.claude/_workspace/00_scenario/scenario.feature`)는 위와 **별도의 주입기**로 `system-architect`·`issue-pm` 두 곳에만 정적 주입한다 (그 밖의 에이전트는 원래도 원본 요구사항을 보지 않으므로 대상이 아니다).
+   - 🔹 **요구사항 시나리오 SSOT — `inject-scenario.mjs` (Phase 1 선행 스텝 전용):** `business-analyst`가 확정한 Gherkin 시나리오(`.claude/_workspace/00_scenario/scenario.feature`)는 위와 **별도의 주입기**로 `system-architect`·`issue-pm`·`e2e-tester` 세 곳에만 정적 주입한다 (그 밖의 에이전트는 원래도 원본 요구사항을 보지 않으므로 대상이 아니다). `e2e-tester`는 Phase 4에서야 스폰되지만, Phase 1에서 커밋된 주입 블록이 그때까지 파일에 그대로 남아 있으므로 재주입이 필요 없다 — `<design_spec>`이 이미 그렇게 동작하는 것과 같은 방식이다.
      ```bash
      node .claude/tools/inject-scenario.mjs
      ```
@@ -227,6 +227,7 @@ allowed-tools:
 - **Heavy 트랙 전용이다.** Fast 트랙은 이 페이즈를 생략하고 Phase 3에서 곧바로 Phase 5로 넘어간다.
 - **진입 조건:** Track A의 모든 레인(FE·BE·데이터)이 완료돼야 한다. 한 레인이라도 남아 있으면 시작하지 않는다.
 - `Agent`로 `e2e-tester` agent type을 명시해 호출한다.
+- `e2e-tester`는 Phase 1에서 이미 주입된 `<scenario_spec>`(BA가 확정한 Gherkin, READY인 경우)을 시나리오의 1차 근거로 삼으므로, 오케스트레이터가 스폰 프롬프트에 시나리오를 따로 요약해 넣을 필요가 없다.
 - 주입된 `<design_spec>`이 확정한 E2E 도구로 작성된 테스트가 100% 통과(Green)되는지 대기한다.
 - ⭐️ **실패 시 핀포인트 재스폰 (Error Log Triage):** `e2e-tester`는 실패를 `area`·`failing`·`evidence`·`repro`·`scope`의 **구조화 판정**으로 반환한다 (형식은 `e2e-tester` 정의의 §3). 오케스트레이터는 `area`만 보고 재스폰 대상을 정한다.
 
@@ -270,11 +271,11 @@ allowed-tools:
 
 ## 🔧 주입 스크립트 레퍼런스 (`.claude/tools/inject-scenario.mjs`)
 
-`inject-design.mjs`와 같은 인터페이스이지만 대상은 `scenario.feature`이고, 대상 에이전트는 `system-architect`·`issue-pm` 두 곳뿐이며, 파일 부재가 실패로 취급되지 않는다.
+`inject-design.mjs`와 같은 인터페이스이지만 대상은 `scenario.feature`이고, 대상 에이전트는 `system-architect`·`issue-pm`·`e2e-tester` 세 곳뿐이며, 파일 부재가 실패로 취급되지 않는다.
 
 | 명령 | 용도 |
 |---|---|
-| `node .claude/tools/inject-scenario.mjs` | `scenario.feature` 전문을 `system-architect`·`issue-pm` 시스템 프롬프트에 주입/갱신 (멱등) |
+| `node .claude/tools/inject-scenario.mjs` | `scenario.feature` 전문을 `system-architect`·`issue-pm`·`e2e-tester` 시스템 프롬프트에 주입/갱신 (멱등) |
 | `node .claude/tools/inject-scenario.mjs --check` | 주입 최신성 검증만 수행. 드리프트가 있으면 exit 1 |
 | `node .claude/tools/inject-scenario.mjs --json` | 결과를 JSON으로 출력 (`fingerprint`, `scenarioReady`, 에이전트별 상태) |
 | `node .claude/tools/inject-scenario.mjs --sections` | 최소 Gherkin 구조(Feature 1개 이상·Scenario 1개 이상·Given/When/Then 2줄 이상)만 검사. 미충족 시 exit 1 |

@@ -16,8 +16,9 @@
  *   - 검증 규칙: `design.md`는 5개 필수 섹션 완결성을, `scenario.feature`는
  *     Gherkin 최소 구조(Feature/Scenario/Given·When·Then)를 검사한다.
  *   - 소비 대상: `design.md`는 구현·QA·리뷰 전 계층이 소비하지만, 시나리오는
- *     `system-architect`·`issue-pm` 두 곳만 소비한다 (계약 설계는 `design_spec`
- *     만으로 충분하며 원본 요구사항을 보지 않는 기존 구조를 유지한다).
+ *     `system-architect`·`issue-pm`·`e2e-tester` 세 곳만 소비한다 (계약 설계·구현은
+ *     `design_spec`만으로 충분하며 원본 요구사항을 보지 않는 기존 구조를 유지하되,
+ *     사용자 시나리오를 직접 검증하는 `e2e-tester`만 예외로 원문을 받는다).
  *   두 관심사를 한 스크립트에 조건 분기로 욱여넣기보다, 각 파일을 계속
  *   자기완결적으로 유지하기 위해 `inject-design.mjs`의 구조를 복제한다.
  *
@@ -55,15 +56,25 @@ const END = '<!-- SCENARIO_SPEC:END -->';
 /**
  * 주입 대상: `scenario.feature`를 요구사항 SSOT로 소비하는 에이전트만.
  *
+ * 포함 대상과 근거:
+ *   - system-architect · issue-pm : 아키텍처·백로그 분할의 1차 근거로 원본
+ *                        요구사항이 필요하다.
+ *   - e2e-tester (Phase 4) : 사용자 시나리오를 처음부터(from scratch) 재도출하지
+ *                        않고, BA가 이미 Gherkin으로 확정한 시나리오를 그대로
+ *                        테스트 케이스의 1차 근거로 삼는다. `issue-pm`이 만드는
+ *                        `issue_report.md`는 DoD 체크리스트로 손실 압축된 형태라
+ *                        원본 BDD 흐름(Given/When/Then)을 온전히 복원하지 못하므로,
+ *                        원문을 별도로 주입해 재도출 비용을 없앤다.
+ *
  * 제외 대상과 근거:
  *   - business-analyst : `scenario.feature`를 **생산**하는 주체. 자기 산출물을
  *                        주입받으면 갱신 직전의 낡은 사본을 SSOT로 오인할 수 있다.
- *   - tech-leader 등 그 외 전원 : 원본 요구사항을 애초에 보지 않고 `<design_spec>`
- *                        (계약 산출 형식·아키텍처 규약)만으로 계약·구현·테스트를
- *                        수행하는 기존 구조를 유지한다. 시나리오까지 이중으로
- *                        받으면 두 SSOT가 계층마다 갈릴 여지가 생긴다.
+ *   - tech-leader 등 그 밖 전원 : 원본 요구사항을 애초에 보지 않고 `<design_spec>`
+ *                        (계약 산출 형식·아키텍처 규약)만으로 계약·구현을 수행하는
+ *                        기존 구조를 유지한다. 시나리오까지 이중으로 받으면 두 SSOT가
+ *                        계층마다 갈릴 여지가 생긴다.
  */
-const TARGETS = ['system-architect', 'issue-pm'];
+const TARGETS = ['system-architect', 'issue-pm', 'e2e-tester'];
 
 // ─────────────────────────────────────────────────────────────
 // 유틸

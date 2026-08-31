@@ -133,7 +133,7 @@ node .claude/tools/inject-design.mjs --clear    # 주입 블록 제거, 하네�
 - **주입 제외:** `system-architect`(`design.md`의 생산자이므로 낡은 사본 주입 금지)와 `release-manager`(스택 의존성 없음).
 - 주입 블록은 자동 생성 영역이다. `<!-- DESIGN_SPEC:BEGIN -->` ~ `<!-- DESIGN_SPEC:END -->` 구간을 손으로 편집하지 않는다.
 
-같은 방식으로, `business-analyst`가 사용자와 요구사항을 정제해 확정한 Gherkin 시나리오(`scenario.feature`)도 형제 스크립트 `inject-scenario.mjs`가 `system-architect`·`issue-pm` 두 곳에만 정적 주입한다 — 단, `design.md`와 달리 시나리오 부재는 파이프라인을 막지 않고 기존 `requirements.md` 경로로 조용히 폴백한다.
+같은 방식으로, `business-analyst`가 사용자와 요구사항을 정제해 확정한 Gherkin 시나리오(`scenario.feature`)도 형제 스크립트 `inject-scenario.mjs`가 `system-architect`·`issue-pm`·`e2e-tester` 세 곳에만 정적 주입한다 — 단, `design.md`와 달리 시나리오 부재는 파이프라인을 막지 않고 기존 `requirements.md` 경로로 조용히 폴백한다. `e2e-tester`가 이 산출물을 받는 이유는 사용자 시나리오를 처음부터 재도출하지 않고, BA가 이미 Gherkin으로 확정한 Given/When/Then을 E2E 테스트 케이스의 1차 근거로 그대로 쓰기 위함이다.
 
 ## 🚀 에이전트 오케스트레이션 파이프라인 (Pipeline Architecture)
 
@@ -333,7 +333,7 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 tools/                             # 어느 호스트에도 속하지 않는 유일한 원본. 설치 시 두 호스트 각자의 tools/로 복사된다
 ├── inject-design.mjs              # design.md ➔ 에이전트 시스템 프롬프트 정적 주입기
 ├── inject-design.test.mjs         # 주입기 회귀 테스트 (node --test)
-├── inject-scenario.mjs            # scenario.feature ➔ system-architect·issue-pm 정적 주입기 (BA 산출물, 부재는 비차단)
+├── inject-scenario.mjs            # scenario.feature ➔ system-architect·issue-pm·e2e-tester 정적 주입기 (BA 산출물, 부재는 비차단)
 └── inject-scenario.test.mjs       # 시나리오 주입기 회귀 테스트 (node --test)
 
 (설치되는 두 호스트 — 설치 옵션에 따라 한쪽 또는 둘 다)

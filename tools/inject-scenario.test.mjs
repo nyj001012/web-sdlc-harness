@@ -27,7 +27,7 @@ const LF = String.fromCharCode(10);
 const CRLF = CR + LF;
 
 /** 주입 대상 계약. 이 집합 자체가 고정 대상이다. */
-const TARGETS = ['system-architect', 'issue-pm'];
+const TARGETS = ['system-architect', 'issue-pm', 'e2e-tester'];
 
 const GOOD_SCENARIO = [
   'Feature: 비눗방울 시뮬레이터 물리 엔진 상호작용',
@@ -207,7 +207,7 @@ test('--check는 파일을 쓰지 않는다', (t) => {
   assert.equal(fx.snapshot(), before);
 });
 
-test('--json은 fingerprint·scenarioReady·대상 2개 상태를 반환한다', (t) => {
+test('--json은 fingerprint·scenarioReady·대상 3개 상태를 반환한다', (t) => {
   const r = runJson(fixture(t), ['--dry-run']);
   assert.equal(r.status, 0);
   assert.equal(r.data.scenarioReady, true);
