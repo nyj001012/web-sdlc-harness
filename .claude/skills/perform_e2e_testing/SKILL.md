@@ -19,7 +19,9 @@ allowed-tools:
    - 🚨 **주의:** E2E 도구를 스스로 가정하지 않는다. 명시가 없으면 작성을 멈추고 `[SPEC GAP]`을 붙여 호출자에게 질의한다.
 
 2. **시나리오 및 DoD 분석 (Scenario Review)**
-   - `.claude/_workspace/02_issues/` 하위의 완료된 이슈 명세서와 주입된 `<design_spec>`을 분석한다.
+   - **주입된 `<scenario_spec>`(BA가 확정한 Gherkin)이 있으면 이를 시나리오의 1차 근거로 삼는다.** `Feature`/`Scenario`의 `Given`/`When`/`Then`을 그대로 E2E 테스트 케이스 단위로 옮기고, 이미 확정된 시나리오를 처음부터(from scratch) 다시 도출하지 않는다.
+   - `.claude/_workspace/02_issues/` 하위의 완료된 이슈 명세서는 DoD·경계값 등 `<scenario_spec>`에 없는 세부사항을 보완하는 보조 근거로 쓴다. `<scenario_spec>`이 `[NOT READY]`면 이슈 명세와 완성된 화면만으로 폴백해 도출한다(기존 방식).
+   - `<scenario_spec>`에 없는 시나리오가 필요하면 임의로 지어내지 말고 `[SCENARIO GAP: <필요한 항목>]`을 붙여 호출자에게 질의한다.
    - 🚨 **주의:** 내부 구현 코드를 훔쳐보고 테스트를 맞추려 하지 말고, 오직 '사용자의 관찰 가능한 행동과 결과' 관점에서만 시나리오를 기획한다.
 
 3. **E2E 테스트 스크립트 작성 (Test Implementation)**
