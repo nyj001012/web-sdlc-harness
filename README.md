@@ -265,7 +265,11 @@ graph TD
 
 ### 명세와 강제의 구분
 
-위 팬인 구조는 에이전트 정의의 `연결:` 규약과 페이즈 진입 조건으로 **서술**돼 있으며, 이를 검사하는 기계적 게이트는 없다. Phase 4가 양쪽 완료를 기다리는 것도 오케스트레이터가 지키는 규칙이지 자동 차단 장치가 아니다. 자동 검증이 붙어 있는 것은 주입기 계약과 배포 오염 차단, 두 곳뿐이다.
+위 팬인 구조는 에이전트 정의의 `연결:` 규약과 페이즈 진입 조건으로 **서술**돼 있으며, 이를 검사하는 기계적 게이트는 없다. Phase 4가 양쪽 완료를 기다리는 것도 오케스트레이터가 지키는 규칙이지 자동 차단 장치가 아니다. 자동 검증이 붙어 있는 곳은 주입기 계약·배포 오염 차단·SSOT 재열람 차단, 세 곳이다.
+
+`design.md`·`scenario.feature`는 하네스가 소비 대상 에이전트의 시스템 프롬프트에 이미 전문을 정적 주입하지만(「설계 명세는 읽지 않고 주입한다」 참고), 에이전트 정의 안의 "도구로 다시 읽지 마라"는 규약은 프롬프트 텍스트일 뿐 강제력이 없었다. `PreToolUse`/`SessionStart` 훅(`.claude/tools/web-sdlc-harness-guard-ssot-read.mjs`·`web-sdlc-harness-check-injection-drift.mjs`, `.codex/`에도 동일 포트)이 이 재열람 시도를 실제로 차단하고, 주입 드리프트를 세션 시작마다 경고한다.
+
+> ⚠️ **Codex 호스트의 알려진 제약:** Codex CLI의 hooks 스키마(`.codex/hooks.json`)는 공식 문서(learn.chatgpt.com/docs/hooks) 그대로 구현했지만, 이 글 작성 시점 기준 **네이티브 Windows에서는 스키마만 인식될 뿐 실제로 도구 호출을 차단하지 않는 것을 직접 확인했다** — 업스트림에도 같은 증상의 이슈가 열려 있다([openai/codex#17478](https://github.com/openai/codex/issues/17478)). macOS·Linux·WSL에서는 정상 작동할 것으로 예상되나 별도로 검증하지는 못했다. 이 이슈가 해결되면 하네스 쪽 수정 없이 그대로 작동한다.
 
 ```bash
 node --test tools/inject-design.test.mjs          # 주입기 회귀 테스트 (모드 계약·멱등성·줄바꿈 보존)
