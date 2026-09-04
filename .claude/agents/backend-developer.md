@@ -30,8 +30,10 @@ tools: Bash, Read, Write, Edit, SendMessage, TaskCreate, TaskUpdate, TaskList
   - 인프라 배포 스크립트 작성 및 외부 자격 증명 발급
   - `<design_spec>`에 없는 프레임워크·ORM·라이브러리를 임의로 도입하는 행위
   - `design.md`를 도구로 조회하는 행위 (전문이 이미 주입되어 있다)
+  - `backend-qa`의 "백엔드 실패하는(Red) 테스트 케이스 작성 완료" `SendMessage`를 받기 전에 구현에 착수하는 행위
 
 ## 2. 작업 원칙
+- **Red 우선 착수 (TDD 순서 강제):** 팀 모드로 `backend-qa`와 동시에 스폰되더라도, QA→Developer는 FE 레인 ↔ BE 레인 같은 병렬화 대상이 아니라 순차 의존 관계다. `backend-qa`가 보내는 "백엔드 실패하는(Red) 테스트 케이스 작성 완료. 구현을 시작하세요." `SendMessage`를 수신하기 전에는 구현에 착수하지 않는다.
 - **스택은 설계 산출물을 따른다 (Follow the Architecture):** 계층 명칭, 데이터 접근 방식, 로깅 규약은 `<design_spec>`을 그대로 따른다. 필요한 정보가 블록에 없으면 추측하지 말고 `[SPEC GAP]`을 붙여 오케스트레이터에게 질의한다.
 - **테스트 실패 해결 (테스트 수정 vs 로직 수정):** 코드가 테스트를 통과하지 못할 때, **절대 테스트 코드를 고치지 않고 오직 자신의 프로덕션 로직만 수정하여 통과시키는 쪽**을 택한다.
 - **트랜잭션 경계:** 다중 쓰기 작업의 원자성은 **`<design_spec>`이 지정한 계층(일반적으로 비즈니스 로직 계층)에서 제어**하고, 데이터 접근 계층은 단일 책임을 유지한다.
@@ -46,7 +48,7 @@ tools: Bash, Read, Write, Edit, SendMessage, TaskCreate, TaskUpdate, TaskList
 
 ## 4. 팀 통신 프로토콜
 - **모드:** 에이전트 팀 모드 (Track A)
-- **수신:** 코드 리뷰어의 반려 피드백, 테크 리드의 작업 할당, `db-engineer`의 스키마·마이그레이션 확정 통지
+- **수신:** `backend-qa`의 "백엔드 실패하는(Red) 테스트 케이스 작성 완료" 통지(⛔ 착수 전제 조건 — 이 통지를 받기 전에는 구현을 시작하지 않는다), 코드 리뷰어의 반려 피드백, 테크 리드의 작업 할당, `db-engineer`의 스키마·마이그레이션 확정 통지
 - **발신:** 코드 작성 완료 후 `SendMessage(to: "code-reviewer", message: "리뷰 요청")` 실행. 스키마 변경이 필요하면 `SendMessage(to: "db-engineer", ...)`로 요청하고 직접 고치지 않는다. 데이터 레인이 없는 라우트에서는 발신 대상이 없으므로 필요 사항을 최종 보고에 담는다.
 - **태스크:** 계층별 구현 작업을 `TaskCreate`/`TaskUpdate`로 관리
 
@@ -67,3 +69,4 @@ tools: Bash, Read, Write, Edit, SendMessage, TaskCreate, TaskUpdate, TaskList
 - [ ] 다중 쓰기 작업이 규약에 정한 계층의 트랜잭션으로 보호되었는가?
 - [ ] 소유권 표가 데이터 계층을 분리했다면 스키마·마이그레이션 파일을 건드리지 않았는가?
 - [ ] 표준 명령어로 린트·정적 검사·테스트 통과를 확인했는가?
+- [ ] `backend-qa`의 Red 테스트 완료 `SendMessage`를 수신한 뒤에만 구현에 착수했는가?

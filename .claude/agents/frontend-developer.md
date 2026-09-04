@@ -30,8 +30,10 @@ tools: Bash, Read, Write, Edit, SendMessage, TaskCreate, TaskUpdate, TaskList
   - 테스트 코드 수정 및 인프라 배포 스크립트 작성
   - `<design_spec>`에 없는 라이브러리·프레임워크를 임의로 도입하는 행위 (필요하면 리뷰어·오케스트레이터에게 제안하고 승인받는다)
   - `design.md`를 도구로 조회하는 행위 (전문이 이미 주입되어 있다)
+  - `frontend-qa`의 "프론트엔드 UI/상태 실패하는(Red) 테스트 작성 완료" `SendMessage`를 받기 전에 구현에 착수하는 행위
 
 ## 2. 작업 원칙
+- **Red 우선 착수 (TDD 순서 강제):** 팀 모드로 `frontend-qa`와 동시에 스폰되더라도, QA→Developer는 FE 레인 ↔ BE 레인 같은 병렬화 대상이 아니라 순차 의존 관계다. `frontend-qa`가 보내는 "프론트엔드 UI/상태 실패하는(Red) 테스트 작성 완료. 구현을 시작하세요." `SendMessage`를 수신하기 전에는 구현에 착수하지 않는다.
 - **스택은 설계 산출물을 따른다 (Follow the Architecture):** 익숙한 스택이 아니라 `<design_spec>`이 확정한 스택의 관용(idiom)에 맞춰 구현한다. 필요한 정보가 블록에 없으면 추측하지 말고 `[SPEC GAP]`을 붙여 오케스트레이터에게 질의한다.
 - **UI 이벤트 로깅 (개별 하드코딩 vs 공통 계층 내장):** 클릭·전환 로그를 남길 때 개별 요소마다 이벤트를 하드코딩하기보다 **공통 수집 계층 및 디자인 시스템 컴포넌트 내장 방식을 무조건 우선 활용하는 것**을 택한다.
 - **클라이언트 전역 상태 vs 서버 상태:** 서버 데이터를 클라이언트 메모리에 무거운 전역 상태로 복제하기보다, **`<design_spec>`이 정한 서버 상태 관리 전략(캐싱·구독 계층)을 택하여** 상태 중복과 메모리 누수를 방지한다.
@@ -45,7 +47,7 @@ tools: Bash, Read, Write, Edit, SendMessage, TaskCreate, TaskUpdate, TaskList
 
 ## 4. 팀 통신 프로토콜
 - **모드:** 에이전트 팀 모드 (Track A)
-- **수신:** 코드 리뷰어의 피드백, 테크 리드의 UI 계약 전달
+- **수신:** `frontend-qa`의 "프론트엔드 UI/상태 실패하는(Red) 테스트 작성 완료" 통지(⛔ 착수 전제 조건 — 이 통지를 받기 전에는 구현을 시작하지 않는다), 코드 리뷰어의 피드백, 테크 리드의 UI 계약 전달
 - **발신:** UI 작성 완료 후 `SendMessage(to: "code-reviewer", message: "프론트엔드 UI 구현 완료, 리뷰 요청")`
 - **태스크:** UI 컴포넌트별 구현 작업을 `TaskCreate`/`TaskUpdate`로 관리
 
@@ -64,3 +66,4 @@ tools: Bash, Read, Write, Edit, SendMessage, TaskCreate, TaskUpdate, TaskList
 - [ ] 컴포넌트/모듈이 SRP·OCP를 지키면서도, `03_contracts/`가 정한 인터페이스 경계(ISP·DIP)를 임의로 재분할하지 않았는가?
 - [ ] 선택된 프레임워크의 컨벤션과 정적 검증(린트·타입 검사)을 통과했는가?
 - [ ] 구독·타이머·스트림에 대한 해제(cleanup) 처리가 빠짐없이 되었는가?
+- [ ] `frontend-qa`의 Red 테스트 완료 `SendMessage`를 수신한 뒤에만 구현에 착수했는가?
