@@ -111,7 +111,7 @@ allowed-tools:
   - 이 파이프라인 세션으로 돌아와 "BA 완료"라고 알린다. 대화 내용은 전달하지 않는다.
   - 대안: 사용자가 원하면 이 세션에서 `refine_requirements` 스킬로 직접 문답할 수도 있다. 다만 문답이 이 세션 컨텍스트에 남으므로 Gate 1 통과 뒤 `/clear`(또는 새 세션)로 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다.
 - **완성본 승인은 BA 세션의 사용자 응답이다.** "BA 완료"라는 말만으로는 승인으로 간주하지 않고 `scenario.feature`가 실제로 있는지 확인한다. 미응답·수정 요청·부분 산출물(`[WAITING USER]`)은 `scenario.feature`가 없거나 초안보다 오래된 상태이며 설계·계약에 진입하지 않는다.
-- **오케스트레이터가 보는 것은 파일 상태뿐이다:** `.claude/_workspace/00_scenario/scenario.feature`가 존재하고, `scenario.draft.feature`가 있다면 그보다 오래되지 않았으며(`ls -t`로 비교), `node .claude/tools/inject-scenario.mjs --sections`가 exit 0일 때만 다음 단계로 진행한다. 초안이 더 새것이면 승인되지 않은 수정이 남은 것이므로 BA 세션에서 재승인받는다. 오케스트레이터 자신이 `scenario.feature`를 쓰거나 승인하지 않는다.
+- **오케스트레이터가 보는 것은 파일 상태뿐이다:** `.claude/_workspace/00_scenario/scenario.feature`가 존재하고, `scenario.draft.feature`가 있다면 두 파일의 **내용이 동일**하며(`cmp .claude/_workspace/00_scenario/scenario.draft.feature .claude/_workspace/00_scenario/scenario.feature`가 exit 0), `node .claude/tools/inject-scenario.mjs --sections`가 exit 0일 때만 다음 단계로 진행한다. BA는 승인 시 초안과 동일한 내용으로 확정본을 쓰므로, 내용이 다르면 승인되지 않은 수정이 남은 것이다 — `[WAITING USER]`로 멈추고 BA 세션에서 재승인받는다. 수정 시각 비교는 체크아웃·복사에 흔들리므로 쓰지 않는다. 오케스트레이터 자신이 `scenario.feature`를 쓰거나 승인하지 않는다.
 - **Pruning:** BA 세션이 종료되면 문답은 폐기된다. 오케스트레이터 컨텍스트에는 문답이 들어온 적이 없고, 보고·감사 로그·인계 파일에는 상태·경로·지문만 남긴다. 이후 에이전트에는 확정 파일만 정적 주입한다. 컨텍스트가 실제로 지워졌다고 주장하지 않는다.
 - 승인 확인 후 `node .claude/tools/inject-scenario.mjs`로 최종 산출물만 정적 주입한다. Phase 1을 건너뛰는 FE/BE 단독 Heavy 라우트도 동일하게 적용한다. 게이트를 생략한 경우만 기존 파일 부재 폴백이 허용된다.
 
