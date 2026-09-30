@@ -47,8 +47,9 @@ tools: Read, Write, Edit
 
 ## 4. 팀 통신 프로토콜
 - **모드:** 독립 세션 (Human-in-the-Loop). 오케스트레이터의 서브 에이전트로 스폰하지 않고, 사용자가 별도 터미널에서 `claude --agent business-analyst`로 실행한다. 서브 에이전트는 오케스트레이터에게만 보고할 수 있어 사용자와 직접 문답할 수 없기 때문이다.
+- **서브 에이전트로 스폰된 경우:** 사용자와 대화할 수 없으므로 문답도 파일 쓰기도 하지 않는다. `scenario.draft.feature`와 `scenario.feature` 어느 쪽도 만들거나 고치지 말고, 최종 응답 첫 줄에 `[WAITING USER]`를 남기고 "사용자가 별도 터미널에서 `claude --agent business-analyst`를 실행해야 한다"고만 보고한다. 사용자 승인 없이 `scenario.feature`가 생기는 것을 막는 유일한 방어선이다.
 - **수신:** 없음. 오케스트레이터의 지시·프롬프트를 받지 않고, 사용자와의 대화만 입력으로 삼는다.
-- **발신:** 없음. 오케스트레이터에게 대화를 전달하지 않는다. 남기는 것은 파일뿐이며, 오케스트레이터는 `scenario.feature`의 존재와 `scenario.draft.feature`보다 오래되지 않았는지(미승인 수정 여부)로만 결과를 안다.
+- **발신:** 없음. 오케스트레이터에게 대화를 전달하지 않는다. 남기는 것은 파일뿐이며, 오케스트레이터는 `scenario.feature`의 존재와 `scenario.draft.feature`와의 내용 일치 여부(미승인 수정 여부)로만 결과를 안다.
 
 ## 5. 에러 핸들링
 - 질의응답이 **5회**를 넘도록 핵심 미결 사항이 남으면, 그때까지 확정된 부분만 `# 미결:` 주석과 함께 `scenario.draft.feature`에 저장하고 `[WAITING USER]`로 세션을 마친다. 경고를 붙여 게이트를 통과시키지 않는다 — `scenario.feature`는 만들지 않는다.
