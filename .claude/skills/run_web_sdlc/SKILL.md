@@ -109,8 +109,9 @@ allowed-tools:
 - **문답 경로 (Claude Code):** 서브 에이전트는 사용자와 직접 대화할 수 없으므로 둘 중 하나로 수행한다.
   - **기본 — 질문 중계 라운드 루프:** `business-analyst`를 서브 에이전트로 스폰한다. 응답 첫 줄이 `[NEEDS INPUT]`이면 질문 목록을 사용자에게 그대로 전달(대화 또는 `AskUserQuestion`)하고, 답변을 받으면 "원 요청 + 누적 Q&A"를 실어 동일 역할을 재스폰한다. 첫 줄이 `[SCENARIO READY]`가 될 때까지 반복한다.
   - **대안 — 메인 대화에서 직접:** 사용자가 원하거나 질문이 많으면 `refine_requirements` 스킬을 메인 대화에서 실행해 사용자와 직접 문답한다.
-- **완성본 승인:** 오케스트레이터는 `scenario.feature` 전문을 사용자에게 보여주고 명시적 최종 확인을 기다린다. 파일 존재·`[SCENARIO READY]`만으로 승인으로 간주하지 않는다. 미응답·수정 요청·부분 산출물(`[WAITING USER]`)은 대기 상태이며 설계·계약에 진입하지 않는다.
-- **승인 명령:** 사용자가 세션에서 `! node .claude/tools/human-gate.mjs requirements --approve`를 직접 실행해 완성본을 확인하고 `APPROVE`를 입력한다. 에이전트는 이 명령을 실행하거나 입력을 파이프로 자동화하지 않는다.
+- **완성본 승인:** 오케스트레이터는 `node .claude/tools/human-gate.mjs requirements --show`로 `scenario.feature` 전문과 지문을 사용자에게 보여주고 명시적 최종 확인을 기다린다. 파일 존재·`[SCENARIO READY]`만으로 승인으로 간주하지 않는다. 미응답·수정 요청·부분 산출물(`[WAITING USER]`)은 대기 상태이며 설계·계약에 진입하지 않는다.
+- **승인 수집:** 오케스트레이터(메인 대화)가 `AskUserQuestion`으로 "승인 / 수정 요청"을 묻는다. 사용자가 직접 "승인"이라고 답해도 된다. 명확한 승인이 아닌 답(무응답, "좋아 보이는데 이건 바꿔줘" 같은 조건부 답)은 승인이 아니다.
+  승인을 받으면 **오케스트레이터만** 사용자가 본 지문으로 영수증을 기록한다: `node .claude/tools/human-gate.mjs requirements --approve --by-user "<사용자 발화>" --fingerprint <보여준 지문>`. 서브 에이전트·팀원은 이 명령을 실행하지 않고, 사용자 승인 없이 오케스트레이터가 실행하지도 않는다. 발화 원문은 영수증에 저장되지 않는다. 사용자가 직접 확인하길 원하면 `! node .claude/tools/human-gate.mjs requirements --approve`(터미널 입력 방식)도 그대로 쓸 수 있다.
   오케스트레이터는 `node .claude/tools/human-gate.mjs requirements --check`와 `node .claude/tools/inject-scenario.mjs --sections`가 모두 exit 0일 때만 다음 단계로 진행한다. `scenario.feature`·spec.md·requirements.md가 바뀌면 승인 지문이 무효화되어 다시 승인받는다.
 - **Pruning/Injection:** BA의 최종 보고에는 상태·경로·지문만 남긴다. 원문 Q&A·대화 요약은 보고, 감사 로그, 인계 파일에 저장하지 않는다. 라운드 재스폰용 누적 Q&A는 Gate 1이 끝나면 버리고, 이후 에이전트에는 확정 파일만 정적 주입한다. 메인 대화에서 직접 문답했다면 Gate 1 통과 뒤 `/clear`(또는 새 세션)로 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다. 컨텍스트가 실제로 지워졌다고 주장하지 않는다.
 - 승인 확인 후 `node .claude/tools/inject-scenario.mjs`로 최종 산출물만 정적 주입한다. Phase 1을 건너뛰는 FE/BE 단독 Heavy 라우트도 동일하게 적용한다. 게이트를 생략한 경우만 기존 파일 부재 폴백이 허용된다.

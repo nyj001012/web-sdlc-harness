@@ -27,6 +27,13 @@ export function check(host, gate) {
   }
   return current;
 }
+// 사용자가 채팅/선택지로 준 승인 발화가 명확한 승인인지 판별한다. 수정 요청·질문이 섞이면 거부한다.
+export function isApprovalUtterance(text) {
+  const t = String(text ?? '').trim();
+  if (!t || t.length > 30) return false;
+  if (/수정|변경|바꿔|고쳐|하지만|근데|\?|but|however/i.test(t)) return false;
+  return /^(승인|approve|approved|lgtm|ok|okay|네|예|응|좋아|좋습니다|진행)/i.test(t);
+}
 async function main() {
   const args = process.argv.slice(2);
   const gate = args[0];
@@ -34,7 +41,14 @@ async function main() {
   const inferred = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const host = index >= 0 ? resolve(args[index + 1] ?? '') : inferred;
   if (!['.claude', '.codex'].includes(basename(host))) throw new Error('Supply --host .claude or --host .codex');
-  if (args.includes('--check') === args.includes('--approve')) throw new Error('Choose --check or --approve');
+  const value = (name) => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
+  if (['--check', '--approve', '--show'].filter((m) => args.includes(m)).length !== 1) throw new Error('Choose --check, --approve or --show');
+  if (args.includes('--show')) {
+    const current = snapshot(host, gate);
+    console.log(readFileSync(join(host, current.artifact), 'utf8'));
+    console.log(`\n${gate}: ${current.fingerprint}`);
+    return;
+  }
   if (args.includes('--check')) {
     const current = check(host, gate);
     console.log(`APPROVED ${gate} ${current.fingerprint}`);
@@ -43,6 +57,14 @@ async function main() {
   const current = snapshot(host, gate);
   const receipt = join(host, '_workspace', 'human-gates', `${gate}.json`);
   mkdirSync(dirname(receipt), { recursive: true });
+  if (args.includes('--by-user')) {
+    // 오케스트레이터(메인 대화)만 사용한다. 사용자가 방금 본 지문과 승인 발화를 함께 요구하고, 발화 원문은 저장하지 않는다.
+    if (!isApprovalUtterance(value('--by-user'))) throw new Error('WAITING_USER: explicit approval utterance required');
+    if (value('--fingerprint') !== current.fingerprint) throw new Error('WAITING_USER: fingerprint mismatch (artifact changed since the user reviewed it)');
+    writeFileSync(receipt, JSON.stringify({ status: 'APPROVED', snapshot: current, approvedVia: 'user-chat', approvedAt: new Date().toISOString() }) + '\n');
+    console.log(`APPROVED ${gate} ${current.fingerprint}`);
+    return;
+  }
   writeFileSync(receipt, JSON.stringify({ status: 'WAITING_USER', snapshot: current }) + '\n');
   console.log(readFileSync(join(host, current.artifact), 'utf8'));
   console.log(`\n${gate}: ${current.fingerprint}\n완성본을 확인하고 승인하려면 APPROVE를 입력하세요. 다른 입력/EOF는 진행을 차단합니다.`);
