@@ -18,7 +18,7 @@ allowed-tools:
 
 ## 📌 Orchestration Rules (절대 준수 규칙)
 
-**Gate 1·2 예외:** 아래 일반 서브 에이전트 보고 규칙보다 사용자 검토 게이트가 우선한다. BA와 QA(CASE_REVIEW)는 오케스트레이터 밖의 독립 세션에서 사용자와 직접 문답하고 파일만 남긴다. BA가 만든 시나리오와 QA가 만든 테스트 명세는 사용자 승인 전까지 확정이 아니며, 오케스트레이터는 승인 상태(`human-gate.mjs --check`)를 통과한 뒤에만 다음 단계로 진행한다.
+**Gate 1·2 예외:** 아래 일반 서브 에이전트 보고 규칙보다 사용자 검토 게이트가 우선한다. BA와 QA(CASE_REVIEW)는 오케스트레이터 밖의 독립 세션에서 사용자와 직접 문답하고 파일만 남긴다. Gate 1의 시나리오는 사용자가 승인해 `scenario.feature`로 확정되기 전까지, Gate 2의 테스트 명세는 승인 영수증(`human-gate.mjs tests --check`)이 확인되기 전까지 확정이 아니며, 오케스트레이터는 그 확인을 통과한 뒤에만 다음 단계로 진행한다.
 
 1. **팀원 간 직접 통신 (P2P Communication)**
    - ⭐️ **스폰 모드 정책:** 팀 모드는 **Heavy 트랙 Phase 3 Track A에만** 쓴다 (QA ↔ Developer ↔ Reviewer ↔ DB 핑퐁). 그 밖의 모든 역할은 **서브 에이전트**로 스폰하고 결과를 최종 보고로만 받는다. 아래 P2P 규칙은 Track A teammate에게만 적용된다.
@@ -63,7 +63,7 @@ allowed-tools:
      node .claude/tools/inject-scenario.mjs
      ```
      - ⚠️ **`design.md`와 결정적으로 다른 점: 시나리오 부재는 차단 사유가 아니다.** `scenario.feature`가 없으면 `[NOT READY]` 블록이 주입되고, 대상 에이전트는 게이트 생략 경로에서만 정제된 spec.md/requirements.md로 폴백한다 — BA 단계를 거치지 않는 경로(기존 코드베이스에 소규모 변경을 더하는 경우 등)에서 정상적으로 발생하는 상태다.
-     - **재주입 시점:** Phase 0 Gate 1에서 BA 독립 세션이 `scenario.feature`를 승인받고 오케스트레이터가 `human-gate.mjs requirements --check`를 통과시킨 직후, `system-architect` 스폰 **전**.
+     - **재주입 시점:** Phase 0 Gate 1에서 BA 독립 세션이 사용자 승인으로 `scenario.feature`를 확정하고 오케스트레이터가 아래 Gate 1의 파일 확인을 통과시킨 직후, `system-architect` 스폰 **전**.
      - **최신성 검증:** `node .claude/tools/inject-scenario.mjs --check`. `SCENARIO_FINGERPRINT` 불일치·`none` 반환 시의 진단은 위 `DESIGN_FINGERPRINT`와 동일하게 처리한다 (세션 재시작 요청, 단 Node 부재로 인한 실행 불가는 예외).
 6. **페이즈 인계 계약 (Phase Handoff Contract)**
    - 오케스트레이터 컨텍스트는 길어지면 요약(auto-compact)되거나 세션 재시작으로 사라진다. 페이즈 경계에서 다음 페이즈가 필요한 사실을 **파일로 남겨** 컨텍스트를 잃어도 인계가 끊기지 않게 한다. 컨텍스트를 잘라내는 것이 아니라 **잃어도 무해한 구조**를 만드는 것이 목적이다.
@@ -107,14 +107,13 @@ allowed-tools:
 - **시점:** 라우트·난이도 판별 직후, 설계·계약 이전. Phase 0의 스택 확보용 최소 아키텍트 호출보다도 먼저 수행한다.
 - **조건:** Heavy Track에서 요구사항이 불명확하면 필수. 현 요청과 일치하는 명확한 spec.md/requirements.md 또는 승인된 시나리오가 있으면 생략 가능하며 근거·파일 경로를 감사 로그에 남긴다. Fast·문서 단독·하네스 메타는 생략한다. Fast→Heavy 승격 시 다시 판별한다.
 - **BA 독립 세션 (P2P 문답):** 오케스트레이터는 BA 문답에 관여하지 않는다. 질문 중계·누적 Q&A 재스폰을 하지 않고, `business-analyst`를 서브 에이전트로 스폰하지도 않는다. 서브 에이전트는 오케스트레이터에게만 보고할 수 있어 사용자와 직접 문답할 수 없기 때문이다. Gate 1이 필요하면 오케스트레이터는 파이프라인을 **[WAITING_USER]로 멈추고** 사용자에게 아래를 안내한다.
-  - 별도 터미널에서 `claude --agent business-analyst`를 실행해 BA와 직접 문답한다. BA가 `scenario.feature`를 작성하고, 사용자가 그 세션에서 완성본을 보고 "승인"이라고 답하면 BA가 승인 영수증을 기록한 뒤 세션을 종료한다.
+  - 별도 터미널에서 `claude --agent business-analyst`를 실행해 BA와 직접 문답한다. BA는 승인 전에는 `scenario.draft.feature`에만 쓰고, 사용자가 그 세션에서 완성본을 보고 "승인"이라고 답하면 `scenario.feature`를 쓴 뒤 세션을 종료한다. **`scenario.feature`의 존재가 곧 사용자 승인이다.**
   - 이 파이프라인 세션으로 돌아와 "BA 완료"라고 알린다. 대화 내용은 전달하지 않는다.
   - 대안: 사용자가 원하면 이 세션에서 `refine_requirements` 스킬로 직접 문답할 수도 있다. 다만 문답이 이 세션 컨텍스트에 남으므로 Gate 1 통과 뒤 `/clear`(또는 새 세션)로 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다.
-- **완성본 승인은 BA 세션의 사용자 응답이다.** 파일 존재·"BA 완료"라는 말만으로 승인으로 간주하지 않는다. 미응답·수정 요청·부분 산출물(`[WAITING USER]`)은 대기 상태이며 설계·계약에 진입하지 않는다.
-- **오케스트레이터가 보는 것은 파일 상태뿐이다:** `node .claude/tools/human-gate.mjs requirements --check`와 `node .claude/tools/inject-scenario.mjs --sections`가 모두 exit 0일 때만 다음 단계로 진행한다. `scenario.feature`·spec.md·requirements.md가 바뀌면 승인 지문이 무효화되어 BA 세션에서 다시 승인받는다. 오케스트레이터 자신이 `--approve`를 실행하지 않는다.
+- **완성본 승인은 BA 세션의 사용자 응답이다.** "BA 완료"라는 말만으로는 승인으로 간주하지 않고 `scenario.feature`가 실제로 있는지 확인한다. 미응답·수정 요청·부분 산출물(`[WAITING USER]`)은 `scenario.feature`가 없거나 초안보다 오래된 상태이며 설계·계약에 진입하지 않는다.
+- **오케스트레이터가 보는 것은 파일 상태뿐이다:** `.claude/_workspace/00_scenario/scenario.feature`가 존재하고, `scenario.draft.feature`가 있다면 그보다 오래되지 않았으며(`ls -t`로 비교), `node .claude/tools/inject-scenario.mjs --sections`가 exit 0일 때만 다음 단계로 진행한다. 초안이 더 새것이면 승인되지 않은 수정이 남은 것이므로 BA 세션에서 재승인받는다. 오케스트레이터 자신이 `scenario.feature`를 쓰거나 승인하지 않는다.
 - **Pruning:** BA 세션이 종료되면 문답은 폐기된다. 오케스트레이터 컨텍스트에는 문답이 들어온 적이 없고, 보고·감사 로그·인계 파일에는 상태·경로·지문만 남긴다. 이후 에이전트에는 확정 파일만 정적 주입한다. 컨텍스트가 실제로 지워졌다고 주장하지 않는다.
 - 승인 확인 후 `node .claude/tools/inject-scenario.mjs`로 최종 산출물만 정적 주입한다. Phase 1을 건너뛰는 FE/BE 단독 Heavy 라우트도 동일하게 적용한다. 게이트를 생략한 경우만 기존 파일 부재 폴백이 허용된다.
-- 승인 상태는 `.claude/_workspace/human-gates/requirements.json`에 경로·해시·상태만 저장한다. 이 도구는 승인 입출력 보조 도구이며 채팅 기록이나 메모리를 삭제하지 않는다.
 
 ### Phase 0: 컨텍스트 분석 및 동적 라우팅
 - 사용자 요청과 `.claude/_workspace/`의 기존 산출물을 분석하여 필요한 페이즈만 선택한다.
@@ -222,7 +221,7 @@ allowed-tools:
 - **QA 독립 세션 (P2P 문답):** 오케스트레이터는 QA 문답에 관여하지 않는다. 질문 중계·재스폰을 하지 않고 CASE_REVIEW용 QA를 서브 에이전트로 스폰하지도 않는다(서브 에이전트는 사용자와 직접 문답할 수 없다). Gate 2가 필요하면 파이프라인을 **[WAITING_USER]로 멈추고** 사용자에게 안내한다: 별도 터미널에서 `claude --agent backend-qa`(또는 `frontend-qa`)를 실행해 QA와 직접 문답하고, QA가 test-cases.md를 작성해 사용자의 승인을 받은 뒤 세션이 종료되면, 이 세션으로 돌아와 "QA 완료"라고 알린다. 하나의 QA 세션이 FE/BE 레인 전체를 맡으며 이 시점에는 테스트/개발/DB 구현 역할을 시작하지 않는다.
 - 대안: 사용자가 원하면 이 세션에서 `design_backend_tdd_cases`/`design_frontend_tdd_cases`를 CASE_REVIEW로 직접 실행할 수 있다. 다만 문답이 이 세션 컨텍스트에 남으므로 Gate 2 통과 뒤 `/clear`(또는 새 세션)로 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다.
 - QA 세션은 사용자 필수 테스트 상황을 먼저 입력받은 뒤 요구사항·계약에서 경계 조건/예외를 추출한다. 제안은 ID·상황·기대 결과·이유를 담은 리스트로 **반드시 배치 질의**한다. 번호별 승인/제외/수정을 받고 한 건씩 질문하는 루프는 금지한다.
-- **승인은 QA 세션의 사용자 응답이다.** 파일 존재·"QA 완료"라는 말·시간 경과는 승인이 아니다. 오케스트레이터가 보는 것은 파일 상태뿐이며 `node .claude/tools/human-gate.mjs tests --check`의 exit 0일 때만 Phase 3 코드를 작성하는 역할을 호출한다. 오케스트레이터 자신이 `--approve`를 실행하지 않는다. `--check`는 tests.json의 명세 지문 및 요구사항·시나리오·설계·계약 지문을 대조하며, 내용 변경·추가·삭제 시 게이트가 다시 열려 QA 세션에서 재승인한다.
+- **승인은 QA 세션의 사용자 응답이다.** 파일 존재·"QA 완료"라는 말·시간 경과는 승인이 아니다. QA 세션은 사용자가 명시적으로 승인한 뒤에만 `node .claude/tools/human-gate.mjs tests --record`로 영수증을 남긴다. 오케스트레이터는 이 명령을 실행하지 않고 `node .claude/tools/human-gate.mjs tests --check`의 exit 0일 때만 Phase 3 코드를 작성하는 역할을 호출한다. `--check`는 명세 지문과 요구사항·시나리오·설계·계약 지문을 영수증과 대조하며, 내용 변경·추가·삭제 시 게이트가 다시 열려 QA 세션에서 재승인한다.
 - **파일 인계:** QA 대화를 종료하고 WRITE_TESTS 모드의 QA와 개발자에게 확정 파일 경로·승인 지문만 전달한다. 대화/요약을 전달하지 않는다. 메인 대화에서 직접 문답했다면 `/clear`나 새 세션에서 `handoff/` 파일과 확정 파일만으로 재개하며, 컨텍스트가 지워졌다고 단정하지 않는다. QA/개발자는 확정 파일을 읽고 ID를 기준으로 작업하며 채팅 내역을 근거로 삼지 않는다.
 - **기존 TDD 순서 유지:** 명세 승인 → QA의 Red 테스트 → 개발 구현 → 리뷰. DB 구현도 명세 승인 이후 시작한다. Full의 인프라 트랙도 게이트 승인 후 시작한다. 승인 상태는 .claude/_workspace/human-gates/tests.json에 해시·상태만 저장한다.
 
