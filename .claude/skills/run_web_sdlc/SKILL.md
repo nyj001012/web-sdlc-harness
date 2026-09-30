@@ -18,7 +18,7 @@ allowed-tools:
 
 ## 📌 Orchestration Rules (절대 준수 규칙)
 
-**Gate 1 예외:** 아래 일반 서브 에이전트 보고 규칙보다 사용자 검토 게이트가 우선한다. BA 문답은 사용자와의 전용 채널/세션에서 직접 진행하고 오케스트레이터에는 확정 파일 상태만 보고한다.
+**Gate 1 예외:** 아래 일반 서브 에이전트 보고 규칙보다 사용자 검토 게이트가 우선한다. BA가 만든 시나리오는 사용자 승인 전까지 확정이 아니며, 오케스트레이터는 승인 상태(`--check`)를 통과한 뒤에만 진행한다.
 
 1. **팀원 간 직접 통신 (P2P Communication)**
    - ⭐️ **스폰 모드 정책:** 팀 모드는 **Heavy 트랙 Phase 3 Track A에만** 쓴다 (QA ↔ Developer ↔ Reviewer ↔ DB 핑퐁). 그 밖의 모든 역할은 **서브 에이전트**로 스폰하고 결과를 최종 보고로만 받는다. 아래 P2P 규칙은 Track A teammate에게만 적용된다.
@@ -106,14 +106,15 @@ allowed-tools:
 ### Gate 1 — Phase 0: BA 요구사항 사용자 최종 확인
 - **시점:** 라우트·난이도 판별 직후, 설계·계약 이전. Phase 0의 스택 확보용 최소 아키텍트 호출보다도 먼저 수행한다.
 - **조건:** Heavy Track에서 요구사항이 불명확하면 필수. 현 요청과 일치하는 명확한 spec.md/requirements.md 또는 승인된 시나리오가 있으면 생략 가능하며 근거·파일 경로를 감사 로그에 남긴다. Fast·문서 단독·하네스 메타는 생략한다. Fast→Heavy 승격 시 다시 판별한다.
-- **직접 문답:** business-analyst가 사용자와 직접 요구사항을 구체화한다. 전용 사용자 대화 채널/세션을 사용하고 오케스트레이터는 질문·답변을 중계하거나 누적 재스폰하지 않는다. 호스트가 서브 에이전트의 직접 사용자 대화를 지원하지 않으면 BA 전용 세션에서 refine_requirements를 실행하고 파일로 재개한다. 기능이 없는 호스트에서 직접 대화가 가능하다고 가정하지 않는다.
-- **완성본 승인:** BA는 Gherkin 완성본을 사용자에게 보여주고 명시적 최종 확인을 기다린다. 파일 존재·[SCENARIO READY]만으로 승인으로 간주하지 않는다. 미응답·수정 요청·부분 산출물은 WAITING_USER이며 설계·계약에 진입하지 않는다.
-- **저장/검사:** .claude/_workspace/00_scenario/scenario.feature에 확정 내용을 저장한다. 사용자 전용 터미널에서 아래 승인 명령으로 완성본을 확인하고 직접 APPROVE를 입력한다. 에이전트가 입력을 생성하거나 파이프로 승인을 자동화하지 않는다.
-  `node .claude/tools/human-gate.mjs requirements --approve`
-  오케스트레이터는 `node .claude/tools/human-gate.mjs requirements --check`와 `node .claude/tools/inject-scenario.mjs --sections`가 모두 exit 0일 때만 다음 단계로 진행한다. 파일·spec.md·requirements.md 변경 시 승인 지문이 무효화되어 재검토한다.
-- **Pruning/Injection:** BA는 최종 보고로 상태·경로·지문만 반환한다. 원문 Q&A·대화 요약·채팅 로그는 보고/감사 로그/인계 파일에 저장하지 않는다. BA 대화 세션을 종료하고 다음 에이전트를 대화 상속 없이 새 컨텍스트로 시작한다(Codex: fork_turns="none"). 호스트의 명시적 컨텍스트 제거 기능이 있으면 실행한다. 이 기능이 없으면 물리적 메모리 삭제를 주장하지 말고, 새 파이프라인 세션에서 확정 파일과 최소 상태만으로 재개한다. 종료한 BA 대화를 resume하거나 자동 요약에 포함하지 않는다.
+- **문답 경로 (Claude Code):** 서브 에이전트는 사용자와 직접 대화할 수 없으므로 둘 중 하나로 수행한다.
+  - **기본 — 질문 중계 라운드 루프:** `business-analyst`를 서브 에이전트로 스폰한다. 응답 첫 줄이 `[NEEDS INPUT]`이면 질문 목록을 사용자에게 그대로 전달(대화 또는 `AskUserQuestion`)하고, 답변을 받으면 "원 요청 + 누적 Q&A"를 실어 동일 역할을 재스폰한다. 첫 줄이 `[SCENARIO READY]`가 될 때까지 반복한다.
+  - **대안 — 메인 대화에서 직접:** 사용자가 원하거나 질문이 많으면 `refine_requirements` 스킬을 메인 대화에서 실행해 사용자와 직접 문답한다.
+- **완성본 승인:** 오케스트레이터는 `scenario.feature` 전문을 사용자에게 보여주고 명시적 최종 확인을 기다린다. 파일 존재·`[SCENARIO READY]`만으로 승인으로 간주하지 않는다. 미응답·수정 요청·부분 산출물(`[WAITING USER]`)은 대기 상태이며 설계·계약에 진입하지 않는다.
+- **승인 명령:** 사용자가 세션에서 `! node .claude/tools/human-gate.mjs requirements --approve`를 직접 실행해 완성본을 확인하고 `APPROVE`를 입력한다. 에이전트는 이 명령을 실행하거나 입력을 파이프로 자동화하지 않는다.
+  오케스트레이터는 `node .claude/tools/human-gate.mjs requirements --check`와 `node .claude/tools/inject-scenario.mjs --sections`가 모두 exit 0일 때만 다음 단계로 진행한다. `scenario.feature`·spec.md·requirements.md가 바뀌면 승인 지문이 무효화되어 다시 승인받는다.
+- **Pruning/Injection:** BA의 최종 보고에는 상태·경로·지문만 남긴다. 원문 Q&A·대화 요약은 보고, 감사 로그, 인계 파일에 저장하지 않는다. 라운드 재스폰용 누적 Q&A는 Gate 1이 끝나면 버리고, 이후 에이전트에는 확정 파일만 정적 주입한다. 메인 대화에서 직접 문답했다면 Gate 1 통과 뒤 `/clear`(또는 새 세션)로 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다. 컨텍스트가 실제로 지워졌다고 주장하지 않는다.
 - 승인 확인 후 `node .claude/tools/inject-scenario.mjs`로 최종 산출물만 정적 주입한다. Phase 1을 건너뛰는 FE/BE 단독 Heavy 라우트도 동일하게 적용한다. 게이트를 생략한 경우만 기존 파일 부재 폴백이 허용된다.
-- 승인 상태는 .claude/_workspace/human-gates/requirements.json에 경로·해시·상태만 저장한다. 이 도구는 승인 입출력 보조 도구이며 호스트 채팅 기록/메모리를 삭제하는 기능은 없다.
+- 승인 상태는 `.claude/_workspace/human-gates/requirements.json`에 경로·해시·상태만 저장한다. 이 도구는 승인 입출력 보조 도구이며 채팅 기록이나 메모리를 삭제하지 않는다.
 
 ### Phase 0: 컨텍스트 분석 및 동적 라우팅
 - 사용자 요청과 `.claude/_workspace/`의 기존 산출물을 분석하여 필요한 페이즈만 선택한다.
