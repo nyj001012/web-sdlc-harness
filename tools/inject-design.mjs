@@ -6,7 +6,8 @@
  *   하위 에이전트가 런타임에 `Read` 도구로 `design.md`를 읽는 구조를 제거하고,
  *   하네스(시스템) 단에서 `design.md` 전문을 파일 시스템으로 직접 읽어
  *   각 에이전트의 **시스템 프롬프트 최상단**에 정적으로 보간(Interpolation)한다.
- *   승인된 scenario.feature가 있으면 {{GHERKIN_SCENARIO}}도 채운다.
+ *   승인된 scenario.feature와 test-cases.md가 있으면 각각
+ *   {{GHERKIN_SCENARIO}}와 {{TEST_CASES}}도 채운다.
  *   템플릿은 design.md 또는 대상 에이전트 본문에 둘 수 있으며, 에이전트 본문의
  *   자동 생성 블록은 갱신·--check·--clear에서 추적한다. 파일 부재/빈 파일은
  *   템플릿을 그대로 남긴다. 승인 전 draft 파일은 입력으로 사용하지 않는다.
@@ -52,6 +53,7 @@ const AGENTS_DIR = join(HOST_DIR, 'agents');
 // Only approved final artifacts are inputs; draft files are never injected.
 const HUMAN_GATE_INPUTS = [
   { token: 'GHERKIN_SCENARIO', path: join(HOST_DIR, '_workspace', '00_scenario', 'scenario.feature') },
+  { token: 'TEST_CASES', path: join(HOST_DIR, '_workspace', '04_test_cases', 'test-cases.md') },
 ];
 
 /**
@@ -244,8 +246,9 @@ function auditSections(design) {
 /** 섹션 검사 결과만 보고한다. 파일을 쓰지 않으며 설계 본문을 출력하지 않는다. */
 function reportSections(design) {
   const sections = auditSections(design);
+  const renderedDesign = renderDesignTemplates(design, readHumanGateInputs());
   const fingerprint =
-    design === null ? 'none' : fingerprintOf(design.split(END).join('<!-- DESIGN_SPEC:END(escaped) -->'));
+    renderedDesign === null ? 'none' : fingerprintOf(renderedDesign.split(END).join('<!-- DESIGN_SPEC:END(escaped) -->'));
   const missing = sections.filter((s) => !s.ok);
   const summary = {
     mode: MODE,
