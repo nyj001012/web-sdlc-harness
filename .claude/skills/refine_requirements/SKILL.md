@@ -29,7 +29,7 @@ allowed-tools:
 4. **산출물 적재 (Save Scenario)**
    - `.claude/_workspace/00_scenario/scenario.feature`에 저장한다.
    - 완성본을 사용자에게 보여주고 명시적 최종 승인을 기다린다. 수정 요청 시 갱신한 완성본을 재확인하며 무응답은 승인으로 간주하지 않는다.
-   - 사용자가 세션에서 `! node .claude/tools/human-gate.mjs requirements --approve`를 직접 실행해 승인한다. 에이전트가 승인 입력을 생성하지 않는다. --check와 inject-scenario.mjs --sections 통과 전에는 설계·계약을 시작하지 않는다.
+   - `node .claude/tools/human-gate.mjs requirements --show`로 지문을 확인해 완성본과 함께 보여주고, `AskUserQuestion`(승인 / 수정 요청) 또는 사용자의 채팅 답변으로 승인을 받는다. 명확한 승인일 때만 `node .claude/tools/human-gate.mjs requirements --approve --by-user "<사용자 발화>" --fingerprint <지문>`으로 영수증을 기록한다. 사용자 승인 없이 이 명령을 실행하거나 승인 발화를 만들어내지 않는다. --check와 inject-scenario.mjs --sections 통과 전에는 설계·계약을 시작하지 않는다.
    - 최종 보고는 [SCENARIO READY], 산출 경로·지문만 남긴다. Q&A 원문/요약은 다른 에이전트에 전달·저장하지 않는다. 다음 단계는 `/clear` 또는 새 세션에서 확정 파일만 정적 주입해 시작하며, 컨텍스트가 지워졌다고 단정하지 않는다.
 
 ## Why (왜 이렇게 하는가?)
