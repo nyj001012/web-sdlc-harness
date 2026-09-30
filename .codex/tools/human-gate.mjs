@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Gate 2(QA 테스트 명세) 승인 영수증. 지문과 경로만 저장하고 대화 내용은 저장하지 않는다.
 //   --record : 사용자의 명시적 승인 뒤에 QA 세션이 실행한다. 현재 지문으로 영수증을 기록한다.
-//   --check  : 오케스트레이터가 실행한다. 영수증이 없거나 명세·요구사항·설계·계약이 바뀌었으면 exit 1.
+//   --check  : 오케스트레이터가 실행한다. 미확정 초안·승인 누락·명세·요구사항·설계·계약 변경 시 exit 1.
 // 승인 의사 자체는 사용자와 직접 대화한 QA 세션이 판단한다. 이 도구는 기록과 stale 감지만 맡는다.
 import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -10,11 +10,18 @@ import { fileURLToPath } from 'node:url';
 
 const GATE = 'tests';
 const ARTIFACT = '_workspace/04_test_cases/test-cases.md';
+const DRAFT = '_workspace/04_test_cases/test-cases.draft.md';
 const hash = (body) => createHash('sha256').update(body).digest('hex');
 
 export function snapshot(host) {
-  const body = readFileSync(join(host, ARTIFACT), 'utf8');
+  const bytes = readFileSync(join(host, ARTIFACT));
+  const body = bytes.toString('utf8');
   if (!body.trim()) throw new Error('Empty artifact');
+  const draft = join(host, DRAFT);
+  // Both record and check use this guard. Identical drafts (or no draft) remain valid.
+  if (existsSync(draft) && !readFileSync(draft).equals(bytes)) {
+    throw new Error('WAITING_USER: draft differs from final test cases (review and reapprove in QA session)');
+  }
   const sources = {};
   for (const name of ['spec.md', 'requirements.md']) {
     const path = resolve(host, '..', name);
