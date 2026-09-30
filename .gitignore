@@ -8,10 +8,6 @@
 .claude/_workspace/handoff/
 .codex/_workspace/handoff/
 
-# 사용자 승인 지문 — 대화 기록 없이 보관하는 런타임 상태
-.claude/_workspace/human-gates/
-.codex/_workspace/human-gates/
-
 # issue-pm 실행 리포트 및 CLI 실패 폴백 — 실제 이슈는 GitHub/GitLab이 SSOT
 .claude/_workspace/02_issues/
 .codex/_workspace/02_issues/

@@ -36,7 +36,7 @@
     "node": ">=16.7.0"
   },
   "scripts": {
-    "test": "node --test tools/inject-design.test.mjs tools/inject-scenario.test.mjs tools/human-gate.test.mjs",
+    "test": "node --test tools/inject-design.test.mjs tools/inject-scenario.test.mjs",
     "preflight": "node bin/cli.mjs --preflight",
     "prepublishOnly": "node .claude/tools/inject-design.mjs --clear && node .codex/tools/inject-design.mjs --clear && node bin/cli.mjs --preflight && npm test"
   }
