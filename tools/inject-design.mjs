@@ -6,6 +6,10 @@
  *   하위 에이전트가 런타임에 `Read` 도구로 `design.md`를 읽는 구조를 제거하고,
  *   하네스(시스템) 단에서 `design.md` 전문을 파일 시스템으로 직접 읽어
  *   각 에이전트의 **시스템 프롬프트 최상단**에 정적으로 보간(Interpolation)한다.
+ *   승인된 scenario.feature가 있으면 {{GHERKIN_SCENARIO}}도 채운다.
+ *   템플릿은 design.md 또는 대상 에이전트 본문에 둘 수 있으며, 에이전트 본문의
+ *   자동 생성 블록은 갱신·--check·--clear에서 추적한다. 파일 부재/빈 파일은
+ *   템플릿을 그대로 남긴다. 승인 전 draft 파일은 입력으로 사용하지 않는다.
  *
  * 왜:
  *   Claude Code·Codex 모두에서 `<host>/agents/<name>.md`(`.claude/` 또는 `.codex/`)의
@@ -45,6 +49,10 @@ const REPO_ROOT = resolve(HOST_DIR, '..');
 // design.md·워크스페이스는 이 스크립트가 설치된 호스트(HOST_DIR) 밑에 독립적으로 둔다.
 const DESIGN_PATH = join(HOST_DIR, '_workspace', '01_architecture', 'design.md');
 const AGENTS_DIR = join(HOST_DIR, 'agents');
+// Only approved final artifacts are inputs; draft files are never injected.
+const HUMAN_GATE_INPUTS = [
+  { token: 'GHERKIN_SCENARIO', path: join(HOST_DIR, '_workspace', '00_scenario', 'scenario.feature') },
+];
 
 /**
  * 호스트별 에이전트 정의 형식. Claude Code는 YAML 프론트매터 + Markdown 본문(`.md`)이고,
@@ -101,6 +109,48 @@ const rel = (p) => relative(REPO_ROOT, p).split('\\').join('/');
 
 /** CRLF/CR을 LF로 정규화해 지문(fingerprint)이 개행 방식에 흔들리지 않게 한다. */
 const normalizeEol = (text) => text.replace(/\r\n?/g, '\n');
+
+function readHumanGateInputs() {
+  return HUMAN_GATE_INPUTS.map((input) => {
+    const body = existsSync(input.path) ? normalizeEol(readFileSync(input.path, 'utf8')) : null;
+    // Escape control markers from payloads so they cannot close managed blocks.
+    const safe = body?.trim() ? body.replace(/<!-- (DESIGN_SPEC|HUMAN_GATE_[A-Z_]+):(BEGIN|END) -->/g,
+      '<!-- $1:$2(escaped) -->') : null;
+    return { ...input, body: safe };
+  });
+}
+
+function renderDesignTemplates(design, inputs) {
+  if (design === null) return null;
+  return design.replace(/\{\{([A-Z_]+)\}\}/g, (token, key) =>
+    inputs.find((input) => input.token === key)?.body ?? token);
+}
+
+function renderAgentTemplates(text, inputs) {
+  // Recreate template slots before rendering so update, deletion and --clear are reversible.
+  for (const input of inputs) {
+    const begin = `<!-- HUMAN_GATE_${input.token}:BEGIN -->`;
+    const end = `<!-- HUMAN_GATE_${input.token}:END -->`;
+    text = text.replace(new RegExp(`${begin}[\\s\\S]*?${end}`, 'g'), `{{${input.token}}}`);
+  }
+  if (MODE === 'clear') return text;
+  return text.replace(/\{\{([A-Z_]+)\}\}/g, (token, key) => {
+    const input = inputs.find((item) => item.token === key);
+    if (!input?.body) return token;
+    const payload = FORMAT === 'toml' ? escapeTomlLiteral(input.body) : input.body;
+    return [`<!-- HUMAN_GATE_${key}:BEGIN -->`,
+      `<!-- source: ${rel(input.path)} | fingerprint: ${fingerprintOf(input.body)} -->`,
+      payload.trimEnd(), `<!-- HUMAN_GATE_${key}:END -->`].join('\n');
+  });
+}
+
+function renderOutsideDesignBlock(text, inputs) {
+  const begin = text.indexOf(BEGIN);
+  const end = text.indexOf(END, begin);
+  if (begin < 0 || end < 0) return renderAgentTemplates(text, inputs);
+  return renderAgentTemplates(text.slice(0, begin), inputs) + text.slice(begin, end + END.length)
+    + renderAgentTemplates(text.slice(end + END.length), inputs);
+}
 
 // ─────────────────────────────────────────────────────────────
 // design.md 필수 섹션 완결성 검사 (--sections)
@@ -317,7 +367,7 @@ function buildBlock(design) {
 // ─────────────────────────────────────────────────────────────
 // 파일 단위 처리
 // ─────────────────────────────────────────────────────────────
-function applyToAgent(agentName, block) {
+function applyToAgent(agentName, block, inputs) {
   const path = join(AGENTS_DIR, `${agentName}${AGENT_EXT}`);
   if (!existsSync(path)) return { agent: agentName, status: 'missing', path: rel(path) };
 
@@ -331,10 +381,12 @@ function applyToAgent(agentName, block) {
 
   let next;
   if (MODE === 'clear') {
-    if (!hasBlock) return { agent: agentName, status: 'clean', path: rel(path) };
-    const before = original.slice(0, beginIdx).trimEnd();
-    const after = original.slice(endIdx + END.length).replace(/^\n+/, '');
-    next = `${before}\n\n${after}`;
+    if (!hasBlock) next = original;
+    else {
+      const before = original.slice(0, beginIdx).trimEnd();
+      const after = original.slice(endIdx + END.length).replace(/^\n+/, '');
+      next = `${before}${FORMAT === 'toml' ? '\n' : '\n\n'}${after}`;
+    }
   } else if (hasBlock) {
     // 기존 블록을 같은 자리에서 교체한다 (멱등).
     next = original.slice(0, beginIdx) + block + original.slice(endIdx + END.length);
@@ -347,7 +399,8 @@ function applyToAgent(agentName, block) {
     next = `${head}\n${block}\n\n${tail}`;
   }
 
-  if (next === original) return { agent: agentName, status: 'unchanged', path: rel(path) };
+  next = renderOutsideDesignBlock(next, inputs);
+  if (next === original) return { agent: agentName, status: MODE === 'clear' ? 'clean' : 'unchanged', path: rel(path) };
   if (MODE === 'check') return { agent: agentName, status: 'stale', path: rel(path) };
   if (!DRY_RUN) writeFileSync(path, eol === '\n' ? next : next.replace(/\n/g, eol), 'utf8');
   return { agent: agentName, status: MODE === 'clear' ? 'cleared' : hasBlock ? 'updated' : 'injected', path: rel(path) };
@@ -372,9 +425,12 @@ function main() {
   // 섹션 검사 모드는 에이전트 파일을 건드리지 않고 여기서 끝난다.
   if (MODE === 'sections') return reportSections(design);
 
+  const inputs = MODE === 'clear' ? HUMAN_GATE_INPUTS : readHumanGateInputs();
+  design = renderDesignTemplates(design, inputs);
+
   const block = MODE === 'clear' ? null : buildBlock(design);
   const fingerprint = design === null ? 'none' : fingerprintOf(design.split(END).join('<!-- DESIGN_SPEC:END(escaped) -->'));
-  const results = TARGETS.map((name) => applyToAgent(name, block));
+  const results = TARGETS.map((name) => applyToAgent(name, block, inputs));
 
   const drift = results.filter((r) => r.status === 'stale' || r.status === 'missing');
   const summary = {
@@ -383,6 +439,8 @@ function main() {
     design: design === null ? null : rel(DESIGN_PATH),
     fingerprint,
     designReady: design !== null,
+    humanGateInputs: inputs.map((input) => ({ token: input.token, path: rel(input.path),
+      ready: Boolean(input.body), fingerprint: input.body ? fingerprintOf(input.body) : 'none' })),
     results,
     ok: drift.length === 0,
   };
