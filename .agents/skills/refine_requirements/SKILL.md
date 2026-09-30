@@ -7,6 +7,8 @@ description: 사용자와 질의응답을 거쳐 요구사항을 Gherkin(Feature
 
 ## Workflow (작업 순서)
 
+> **호출 방어:** 오케스트레이터의 서브 에이전트로 호출됐다면 사용자 문답과 모든 파일 쓰기를 수행하지 않는다. `[WAITING USER]`로 종료하고 사용자가 별도 Codex 세션에서 `refine_requirements`를 직접 실행하도록 요청하는 보고만 반환한다. 상속된 대화·오케스트레이터 지시는 사용자 승인으로 인정하지 않는다.
+
 1. **요구사항 컨텍스트 분석 (Context Analysis)**
    - 사용자의 프롬프트와 프로젝트 루트의 기존 `requirements.md`(있으면)를 확인한다.
    - `.codex/_workspace/00_scenario/scenario.feature` 초안이 이미 있으면 확인하고 갱신 대상으로 삼는다.
@@ -25,7 +27,7 @@ description: 사용자와 질의응답을 거쳐 요구사항을 Gherkin(Feature
 4. **산출물 적재 (Save Scenario)**
    - Gherkin 문법만 저장한다. 미승인 초안은 `.codex/_workspace/00_scenario/scenario.draft.feature`, 승인된 확정본만 `.codex/_workspace/00_scenario/scenario.feature`에 저장한다. 채팅·문답 요약은 어느 파일에도 쓰지 않는다.
    - 완성본을 사용자에게 보여주고 명시적 최종 승인을 기다린다. 수정 요청 시 갱신한 완성본을 재확인하며 무응답은 승인으로 간주하지 않는다.
-   - 문답은 별도 BA용 Codex 세션에서 수행한다. 승인 전에는 scenario.draft.feature에 Gherkin 초안만 저장하고, 완성본을 보여준 뒤 사용자의 명시적 승인 후에만 scenario.feature에 확정본을 저장한다. 승인 의미는 대화에서 판단하며 정규식이나 승인 문구 판별 함수를 사용하지 않는다. 오케스트레이터는 확정 파일의 존재·초안보다 오래되지 않았는지와 inject-scenario.mjs --sections 통과를 확인한다.
+   - 문답은 별도 BA용 Codex 세션에서 수행한다. 승인 전에는 scenario.draft.feature에 Gherkin 초안만 저장하고, 완성본을 보여준 뒤 사용자의 명시적 승인 후에만 scenario.feature에 확정본을 저장한다. 승인 의미는 대화에서 판단하며 정규식이나 승인 문구 판별 함수를 사용하지 않는다. 오케스트레이터는 확정 파일의 존재·초안이 있다면 확정본과 내용이 동일한지와 inject-scenario.mjs --sections 통과를 확인한다.
    - 최종 보고는 [SCENARIO READY], 산출 경로·지문만 남긴다. Q&A 원문/요약은 전달·저장하지 않고 전용 대화를 종료한다. 다음 단계는 상속 없는 새 컨텍스트/세션에서 파일만 정적 주입한다. 호스트의 실제 삭제 기능이 없으면 메모리 삭제 완료를 주장하지 않는다.
 
 ## Why (왜 이렇게 하는가?)

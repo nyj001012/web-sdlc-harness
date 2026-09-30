@@ -97,11 +97,11 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 - **시점:** 라우트·난이도 판별 직후, 설계·계약 이전. Phase 0의 스택 확보용 최소 아키텍트 호출보다도 먼저 수행한다.
 - **조건:** Heavy Track에서 요구사항이 불명확하면 필수. 현 요청과 일치하는 명확한 spec.md/requirements.md 또는 승인된 시나리오가 있으면 생략 가능하며 근거·파일 경로를 감사 로그에 남긴다. Fast·문서 단독·하네스 메타는 생략한다. Fast→Heavy 승격 시 다시 판별한다.
 - **BA 독립 세션 (P2P 문답):** 오케스트레이터는 BA 문답에 관여하지 않는다. 질문 중계·누적 Q&A 재스폰을 하지 않고, `business-analyst`를 서브 에이전트로 스폰하지도 않는다. 서브 에이전트는 오케스트레이터에게만 보고할 수 있어 사용자와 직접 문답할 수 없기 때문이다. Gate 1이 필요하면 오케스트레이터는 파이프라인을 **[WAITING_USER]로 멈추고** 사용자에게 아래를 안내한다.
-  - 새 Codex 세션에서 `refine_requirements`를 실행해 BA와 직접 문답한다. BA는 승인 전에는 `scenario.draft.feature`에만 쓰고, 사용자가 그 세션에서 완성본을 보고 "승인"이라고 답하면 `scenario.feature`를 쓴 뒤 세션을 종료한다. **`scenario.feature`의 존재가 곧 사용자 승인이다.**
+  - 새 Codex 세션에서 `refine_requirements`를 실행해 BA와 직접 문답한다. BA는 승인 전에는 `scenario.draft.feature`에만 쓰고, 사용자가 그 세션에서 완성본을 보고 "승인"이라고 답하면 `scenario.feature`를 쓴 뒤 세션을 종료한다. **`scenario.feature`는 사용자 승인 후에만 저장하며, 초안이 남아 있다면 두 파일 내용이 동일해야 현재 승인으로 인정한다.**
   - 이 파이프라인 세션으로 돌아와 "BA 완료"라고 알린다. 대화 내용은 전달하지 않는다.
   - 대안: 사용자가 원하면 이 세션에서 `refine_requirements` 스킬로 직접 문답할 수도 있다. 다만 문답이 이 세션 컨텍스트에 남으므로 Gate 1 통과 뒤 새 세션으로 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다.
-- **완성본 승인은 BA 세션의 사용자 응답이다.** "BA 완료"라는 말만으로는 승인으로 간주하지 않고 `scenario.feature`가 실제로 있는지 확인한다. 미응답·수정 요청·부분 산출물(`[WAITING USER]`)은 `scenario.feature`가 없거나 초안보다 오래된 상태이며 설계·계약에 진입하지 않는다.
-- **오케스트레이터가 보는 것은 파일 상태뿐이다:** `.codex/_workspace/00_scenario/scenario.feature`가 존재하고, `scenario.draft.feature`가 있다면 그보다 오래되지 않았으며(파일 수정 시각을 비교), `node .codex/tools/inject-scenario.mjs --sections`가 exit 0일 때만 다음 단계로 진행한다. 초안이 더 새것이면 승인되지 않은 수정이 남은 것이므로 BA 세션에서 재승인받는다. 오케스트레이터 자신이 `scenario.feature`를 쓰거나 승인하지 않는다.
+- **완성본 승인은 BA 세션의 사용자 응답이다.** "BA 완료"라는 말만으로는 승인으로 간주하지 않고 `scenario.feature`가 실제로 있는지 확인한다. 미응답·수정 요청·부분 산출물(`[WAITING USER]`)은 `scenario.feature`가 없거나 초안과 확정본의 내용이 다른 상태이며 설계·계약에 진입하지 않는다.
+- **오케스트레이터가 보는 것은 파일 상태뿐이다:** `.codex/_workspace/00_scenario/scenario.feature`가 존재하고, `scenario.draft.feature`가 있다면 두 파일의 내용이 정확히 동일하며(셸에서 바이트 내용을 비교하고 수정 시각은 사용하지 않는다), `node .codex/tools/inject-scenario.mjs --sections`가 exit 0일 때만 다음 단계로 진행한다. 초안과 확정본 내용이 다르면 승인되지 않은 수정이 남은 것이므로 BA 세션에서 재승인받는다. 오케스트레이터 자신이 `scenario.feature`를 쓰거나 승인하지 않는다.
 - **Pruning:** BA 세션을 종료하고 문답을 후속 컨텍스트에 포함하지 않는다. 오케스트레이터 컨텍스트에는 문답이 들어온 적이 없고, 보고·감사 로그·인계 파일에는 상태·경로·지문만 남긴다. 이후 에이전트에는 확정 파일만 정적 주입한다. 컨텍스트가 실제로 지워졌다고 주장하지 않는다.
 - 승인 확인 후 `node .codex/tools/inject-scenario.mjs`로 최종 산출물만 정적 주입한다. Phase 1을 건너뛰는 FE/BE 단독 Heavy 라우트도 동일하게 적용한다. 게이트를 생략한 경우만 기존 파일 부재 폴백이 허용된다.
 
