@@ -23,9 +23,9 @@ description: 사용자와 질의응답을 거쳐 요구사항을 Gherkin(Feature
    - 기존 초안을 고칠 때는 부분 수정으로 처리한다. 전체 재작성으로 재현되지 않은 내용을 지우지 않는다.
 
 4. **산출물 적재 (Save Scenario)**
-   - `.codex/_workspace/00_scenario/scenario.feature`에 저장한다.
+   - Gherkin 문법만 저장한다. 미승인 초안은 `.codex/_workspace/00_scenario/scenario.draft.feature`, 승인된 확정본만 `.codex/_workspace/00_scenario/scenario.feature`에 저장한다. 채팅·문답 요약은 어느 파일에도 쓰지 않는다.
    - 완성본을 사용자에게 보여주고 명시적 최종 승인을 기다린다. 수정 요청 시 갱신한 완성본을 재확인하며 무응답은 승인으로 간주하지 않는다.
-   - 사용자 전용 터미널에서 `node .codex/tools/human-gate.mjs requirements --approve`로 승인한다. 에이전트가 승인 입력을 생성하지 않는다. --check와 inject-scenario.mjs --sections 통과 전에는 설계·계약을 시작하지 않는다.
+   - 문답은 별도 BA용 Codex 세션에서 수행한다. 승인 전에는 scenario.draft.feature에 Gherkin 초안만 저장하고, 완성본을 보여준 뒤 사용자의 명시적 승인 후에만 scenario.feature에 확정본을 저장한다. 승인 의미는 대화에서 판단하며 정규식이나 승인 문구 판별 함수를 사용하지 않는다. 오케스트레이터는 확정 파일의 존재·초안보다 오래되지 않았는지와 inject-scenario.mjs --sections 통과를 확인한다.
    - 최종 보고는 [SCENARIO READY], 산출 경로·지문만 남긴다. Q&A 원문/요약은 전달·저장하지 않고 전용 대화를 종료한다. 다음 단계는 상속 없는 새 컨텍스트/세션에서 파일만 정적 주입한다. 호스트의 실제 삭제 기능이 없으면 메모리 삭제 완료를 주장하지 않는다.
 
 ## Why (왜 이렇게 하는가?)

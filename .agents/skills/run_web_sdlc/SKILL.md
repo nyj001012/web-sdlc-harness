@@ -48,7 +48,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
        - ⛔ **단, 주입 명령이 애초에 실행되지 못한 경우에는 이 진단을 적용하지 마라.** Node가 없어 `exit 127`로 죽었다면 세션을 몇 번 재시작해도 지문은 생기지 않는다. Phase 0의 런타임 선행 검사를 건너뛰었는지 먼저 확인하고, 그렇다면 환경 문제로 보고한다.
    - 🚫 하위 에이전트가 주입 블록에 없는 프레임워크·도구·명령어를 사용하려 하면 즉시 중단시키고, 아키텍처를 갱신(➔ 재주입)하거나 사용자에게 질의한다.
    - 🚫 `system-architect`와 `release-manager`는 주입 대상이 아니다. 전자는 `design.md`의 **생산자**이므로 낡은 사본을 주입받으면 안 되고(이 역할만 `design.md`를 직접 읽고 쓴다), 후자는 스택 의존성이 없다.
-   - 🔹 **요구사항 시나리오 SSOT — `inject-scenario.mjs` (Gate 1 전용):** `business-analyst`가 확정한 Gherkin 시나리오(`.codex/_workspace/00_scenario/scenario.feature`)는 위와 **별도의 주입기**로 `system-architect`·`issue-pm`·`e2e-tester` 세 곳에만 정적 주입한다 (그 밖의 역할은 원래도 원본 요구사항을 보지 않으므로 대상이 아니다). `e2e-tester`는 Phase 4에서야 스폰되지만, Gate 1에서 생성된 주입 블록이 그때까지 파일에 그대로 남아 있으므로 재주입이 필요 없다 — `<design_spec>`이 이미 그렇게 동작하는 것과 같은 방식이다.
+   - 🔹 **요구사항 시나리오 SSOT — `inject-scenario.mjs` (Gate 1 전용):** `business-analyst`가 확정한 Gherkin 시나리오(`.codex/_workspace/00_scenario/scenario.feature`)는 위와 **별도의 주입기**로 `system-architect`·`issue-pm`·`tech-leader`·`e2e-tester` 네 곳에만 정적 주입한다 (그 밖의 역할은 원래도 원본 요구사항을 보지 않으므로 대상이 아니다). `e2e-tester`는 Phase 4에서야 스폰되지만, Gate 1에서 생성된 주입 블록이 그때까지 파일에 그대로 남아 있으므로 재주입이 필요 없다 — `<design_spec>`이 이미 그렇게 동작하는 것과 같은 방식이다.
      ```bash
      node .codex/tools/inject-scenario.mjs
      ```
@@ -96,14 +96,14 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 ### Gate 1 — Phase 0: BA 요구사항 사용자 최종 확인
 - **시점:** 라우트·난이도 판별 직후, 설계·계약 이전. Phase 0의 스택 확보용 최소 아키텍트 호출보다도 먼저 수행한다.
 - **조건:** Heavy Track에서 요구사항이 불명확하면 필수. 현 요청과 일치하는 명확한 spec.md/requirements.md 또는 승인된 시나리오가 있으면 생략 가능하며 근거·파일 경로를 감사 로그에 남긴다. Fast·문서 단독·하네스 메타는 생략한다. Fast→Heavy 승격 시 다시 판별한다.
-- **직접 문답:** business-analyst가 사용자와 직접 요구사항을 구체화한다. 전용 사용자 대화 채널/세션을 사용하고 오케스트레이터는 질문·답변을 중계하거나 누적 재스폰하지 않는다. 호스트가 서브 에이전트의 직접 사용자 대화를 지원하지 않으면 BA 전용 세션에서 refine_requirements를 실행하고 파일로 재개한다. 기능이 없는 호스트에서 직접 대화가 가능하다고 가정하지 않는다.
-- **완성본 승인:** BA는 Gherkin 완성본을 사용자에게 보여주고 명시적 최종 확인을 기다린다. 파일 존재·[SCENARIO READY]만으로 승인으로 간주하지 않는다. 미응답·수정 요청·부분 산출물은 WAITING_USER이며 설계·계약에 진입하지 않는다.
-- **저장/검사:** .codex/_workspace/00_scenario/scenario.feature에 확정 내용을 저장한다. 사용자 전용 터미널에서 아래 승인 명령으로 완성본을 확인하고 직접 APPROVE를 입력한다. 에이전트가 입력을 생성하거나 파이프로 승인을 자동화하지 않는다.
-  `node .codex/tools/human-gate.mjs requirements --approve`
-  오케스트레이터는 `node .codex/tools/human-gate.mjs requirements --check`와 `node .codex/tools/inject-scenario.mjs --sections`가 모두 exit 0일 때만 다음 단계로 진행한다. 파일·spec.md·requirements.md 변경 시 승인 지문이 무효화되어 재검토한다.
-- **Pruning/Injection:** BA는 최종 보고로 상태·경로·지문만 반환한다. 원문 Q&A·대화 요약·채팅 로그는 보고/감사 로그/인계 파일에 저장하지 않는다. BA 대화 세션을 종료하고 다음 에이전트를 대화 상속 없이 새 컨텍스트로 시작한다(Codex: fork_turns="none"). 호스트의 명시적 컨텍스트 제거 기능이 있으면 실행한다. 이 기능이 없으면 물리적 메모리 삭제를 주장하지 말고, 새 파이프라인 세션에서 확정 파일과 최소 상태만으로 재개한다. 종료한 BA 대화를 resume하거나 자동 요약에 포함하지 않는다.
+- **BA 독립 세션 (P2P 문답):** 오케스트레이터는 BA 문답에 관여하지 않는다. 질문 중계·누적 Q&A 재스폰을 하지 않고, `business-analyst`를 서브 에이전트로 스폰하지도 않는다. 서브 에이전트는 오케스트레이터에게만 보고할 수 있어 사용자와 직접 문답할 수 없기 때문이다. Gate 1이 필요하면 오케스트레이터는 파이프라인을 **[WAITING_USER]로 멈추고** 사용자에게 아래를 안내한다.
+  - 새 Codex 세션에서 `refine_requirements`를 실행해 BA와 직접 문답한다. BA는 승인 전에는 `scenario.draft.feature`에만 쓰고, 사용자가 그 세션에서 완성본을 보고 "승인"이라고 답하면 `scenario.feature`를 쓴 뒤 세션을 종료한다. **`scenario.feature`의 존재가 곧 사용자 승인이다.**
+  - 이 파이프라인 세션으로 돌아와 "BA 완료"라고 알린다. 대화 내용은 전달하지 않는다.
+  - 대안: 사용자가 원하면 이 세션에서 `refine_requirements` 스킬로 직접 문답할 수도 있다. 다만 문답이 이 세션 컨텍스트에 남으므로 Gate 1 통과 뒤 새 세션으로 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다.
+- **완성본 승인은 BA 세션의 사용자 응답이다.** "BA 완료"라는 말만으로는 승인으로 간주하지 않고 `scenario.feature`가 실제로 있는지 확인한다. 미응답·수정 요청·부분 산출물(`[WAITING USER]`)은 `scenario.feature`가 없거나 초안보다 오래된 상태이며 설계·계약에 진입하지 않는다.
+- **오케스트레이터가 보는 것은 파일 상태뿐이다:** `.codex/_workspace/00_scenario/scenario.feature`가 존재하고, `scenario.draft.feature`가 있다면 그보다 오래되지 않았으며(파일 수정 시각을 비교), `node .codex/tools/inject-scenario.mjs --sections`가 exit 0일 때만 다음 단계로 진행한다. 초안이 더 새것이면 승인되지 않은 수정이 남은 것이므로 BA 세션에서 재승인받는다. 오케스트레이터 자신이 `scenario.feature`를 쓰거나 승인하지 않는다.
+- **Pruning:** BA 세션을 종료하고 문답을 후속 컨텍스트에 포함하지 않는다. 오케스트레이터 컨텍스트에는 문답이 들어온 적이 없고, 보고·감사 로그·인계 파일에는 상태·경로·지문만 남긴다. 이후 에이전트에는 확정 파일만 정적 주입한다. 컨텍스트가 실제로 지워졌다고 주장하지 않는다.
 - 승인 확인 후 `node .codex/tools/inject-scenario.mjs`로 최종 산출물만 정적 주입한다. Phase 1을 건너뛰는 FE/BE 단독 Heavy 라우트도 동일하게 적용한다. 게이트를 생략한 경우만 기존 파일 부재 폴백이 허용된다.
-- 승인 상태는 .codex/_workspace/human-gates/requirements.json에 경로·해시·상태만 저장한다. 이 도구는 승인 입출력 보조 도구이며 호스트 채팅 기록/메모리를 삭제하는 기능은 없다.
 
 ### Phase 0: 컨텍스트 분석 및 동적 라우팅
 - 사용자 요청과 `.codex/_workspace/`의 기존 산출물을 분석하여 필요한 페이즈만 선택한다.
