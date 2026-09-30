@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // User approval receipts contain hashes and paths only, never conversation history.
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { dirname, resolve, join, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,14 +8,31 @@ import { createInterface } from 'node:readline';
 
 const hash = (body) => createHash('sha256').update(body).digest('hex');
 export function snapshot(host, gate) {
-  if (gate !== 'requirements') throw new Error('Unknown gate');
-  const artifact = '_workspace/00_scenario/scenario.feature';
+  if (!['requirements', 'tests'].includes(gate)) throw new Error('Unknown gate');
+  const artifact = gate === 'requirements'
+    ? '_workspace/00_scenario/scenario.feature' : '_workspace/04_test_cases/test-cases.md';
   const body = readFileSync(join(host, artifact), 'utf8');
   if (!body.trim()) throw new Error('Empty artifact');
   const sources = {};
   for (const name of ['spec.md', 'requirements.md']) {
     const path = resolve(host, '..', name);
     sources[name] = existsSync(path) ? hash(readFileSync(path)) : null;
+  }
+  if (gate === 'tests') {
+    for (const name of ['_workspace/00_scenario/scenario.feature', '_workspace/01_architecture/design.md']) {
+      const path = join(host, name);
+      sources[name] = existsSync(path) ? hash(readFileSync(path)) : null;
+    }
+    const contracts = '_workspace/03_contracts';
+    sources[contracts] = existsSync(join(host, contracts));
+    const walk = (dir) => {
+      for (const name of readdirSync(join(host, dir)).sort()) {
+        const relative = `${dir}/${name}`;
+        if (statSync(join(host, relative)).isDirectory()) walk(relative);
+        else sources[relative] = hash(readFileSync(join(host, relative)));
+      }
+    };
+    if (sources[contracts]) walk(contracts);
   }
   return { gate, artifact, fingerprint: hash(body), sources };
 }
