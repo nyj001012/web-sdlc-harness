@@ -215,7 +215,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 - **파일 인계:** QA 대화를 종료하고 WRITE_TESTS 모드의 QA와 개발자에게 확정 파일 경로·승인 지문만 전달한다. 대화/요약을 전달하지 않는다. 메인 대화에서 직접 문답했다면 새 세션에서 `handoff/` 파일과 확정 파일만으로 재개하며, 컨텍스트가 지워졌다고 단정하지 않는다. QA/개발자는 확정 파일을 읽고 ID를 기준으로 작업하며 채팅 내역을 근거로 삼지 않는다.
 - **기존 TDD 순서 유지:** 명세 승인 → QA의 Red 테스트 → 개발 구현 → 리뷰. DB 구현도 명세 승인 이후 시작한다. Full의 인프라 트랙도 게이트 승인 후 시작한다. 승인 상태는 .codex/_workspace/human-gates/tests.json에 해시·상태만 저장한다.
 
-- **정적 주입:** tests --check 통과 후 `node .codex/tools/inject-design.mjs`를 재실행하고 `--check`로 최신성을 확인한다. 주입기는 `{{GHERKIN_SCENARIO}}`에 승인된 scenario.feature, `{{TEST_CASES}}`에 확정 test-cases.md를 넣는다. --json의 humanGateInputs에서 지문을 확인하고 후속 QA·개발자의 TEST_CASES_FINGERPRINT와 대조한다. 불일치/누락이면 새 컨텍스트 또는 새 세션에서 재개하며 명세 전문을 스폰 프롬프트로 중복 전달하지 않는다.
+- **정적 주입:** tests --check 통과 후 `node .codex/tools/inject-design.mjs`를 재실행하고 `--check`로 최신성을 확인한다. 주입기는 `{{GHERKIN_SCENARIO}}`에 승인된 scenario.feature, `{{TEST_CASES}}`에 확정 test-cases.md를 넣는다. --json의 humanGateInputs에서 지문을 확인한다. 개발자·DB 역할을 스폰할 때 현재 DESIGN_FINGERPRINT와 TEST_CASES_FINGERPRINT 값만 전달하고(명세 전문은 전달하지 않는다), 첫 코드 쓰기 전에 읽기 전용 --check --json 결과와 프롬프트의 설계·테스트 관리 블록 지문을 모두 대조하도록 한다. 최종 보고의 TEST_CASES_FINGERPRINT도 현재 주입 지문과 대조한다. 불일치/누락이면 새 컨텍스트 또는 새 세션에서 재개하며 명세 전문을 스폰 프롬프트로 중복 전달하지 않는다.
 
 ### Phase 3: 순차 위임 개발 (FE/BE/QA/Infra)
 - **착수 조건:** Gate 2 대상 라우트는 tests --check 통과가 필수다. QA의 테스트 작성과 구현 역할 호출에 앞서 검사하고 승인된 test-cases.md를 명시적으로 인계한다.
