@@ -220,10 +220,11 @@ allowed-tools:
 ### Gate 2 — Phase 2~3: QA 테스트 케이스 사용자 협업 검증
 - **진입:** 계약 확정 직후, 테스트 코드·애플리케이션·스키마 구현 이전에 수행한다. Phase 2를 생략하는 FE/BE Heavy 라우트도 Phase 3 첫 단계에서 수행한다. Fast는 QA와 함께 생략하고 Heavy 승격 시 수행한다. TDD QA가 없는 인프라 단독·문서 단독·하네스 메타는 생략 사유를 기록한다.
 - FE/BE QA 중 한 명을 CASE_REVIEW 전용 협업 담당자로 지정한다. 이 시점에는 테스트/개발/DB 구현 역할을 시작하지 않는다. 다른 QA의 제안은 담당자에게 목록으로 모아 질의와 문서 쓰기를 직렬화한다.
+- **문답 경로 (Claude Code):** 서브 에이전트/팀원은 사용자와 직접 대화할 수 없다. 담당 QA를 서브 에이전트로 스폰해 `[NEEDS INPUT]` 질문(첫 질문 포함)을 반환받고, 사용자에게 그대로 전달한 뒤 답변을 실어 같은 담당자를 재스폰한다. 또는 메인 대화에서 `design_backend_tdd_cases`/`design_frontend_tdd_cases`를 CASE_REVIEW로 직접 실행한다.
 - 담당 QA가 사용자 필수 테스트 상황을 먼저 입력받은 뒤 요구사항·계약에서 경계 조건/예외를 추출한다. 제안은 ID·상황·기대 결과·이유를 담은 리스트로 **반드시 배치 질의**한다. 번호별 승인/제외/수정을 받고 한 건씩 질문하는 루프는 금지한다.
-- 담당자는 .claude/_workspace/04_test_cases/test-cases.md 완성본을 보여주고 사용자 최종 승인까지 WAITING_USER로 대기한다. 파일 존재·QA 완료 보고·시간 경과는 승인이 아니다. 사용자 터미널에서 `node .claude/tools/human-gate.mjs tests --approve`로 승인하며 에이전트는 입력을 대행하지 않는다.
+- 담당자가 [TEST CASES READY]로 보고하면 오케스트레이터가 .claude/_workspace/04_test_cases/test-cases.md 완성본을 사용자에게 보여주고 최종 승인까지 WAITING_USER로 대기한다. 파일 존재·QA 완료 보고·시간 경과는 승인이 아니다. 사용자가 세션에서 `! node .claude/tools/human-gate.mjs tests --approve`로 승인하며 에이전트는 입력을 대행하지 않는다.
 - 오케스트레이터는 `node .claude/tools/human-gate.mjs tests --check`의 exit 0을 확인한 뒤에만 Phase 3 코드를 작성하는 역할을 호출한다. 이 검사는 tests.json의 명세 지문 및 요구사항·시나리오·설계·계약 지문을 대조한다. 내용 변경·추가·삭제 시 해당 게이트를 다시 열고 배치 검토/재승인한다.
-- **파일 인계:** QA 대화를 종료하고 WRITE_TESTS 모드의 QA와 개발자에게 확정 파일 경로·승인 지문만 전달한다. 대화/요약을 전달하거나 fork하지 않는다(Codex: fork_turns="none"). 실제 컨텍스트 제거 기능이 없으면 새 사용자 세션으로 파일 기반 재개한다. QA/개발자는 확정 파일을 읽고 ID를 기준으로 작업하며 채팅 내역을 근거로 삼지 않는다.
+- **파일 인계:** QA 대화를 종료하고 WRITE_TESTS 모드의 QA와 개발자에게 확정 파일 경로·승인 지문만 전달한다. 대화/요약을 전달하지 않는다. 메인 대화에서 직접 문답했다면 `/clear`나 새 세션에서 `handoff/` 파일과 확정 파일만으로 재개하며, 컨텍스트가 지워졌다고 단정하지 않는다. QA/개발자는 확정 파일을 읽고 ID를 기준으로 작업하며 채팅 내역을 근거로 삼지 않는다.
 - **기존 TDD 순서 유지:** 명세 승인 → QA의 Red 테스트 → 개발 구현 → 리뷰. DB 구현도 명세 승인 이후 시작한다. Full의 인프라 트랙도 게이트 승인 후 시작한다. 승인 상태는 .claude/_workspace/human-gates/tests.json에 해시·상태만 저장한다.
 
 ### Phase 3: 병렬 개발 트랙 (FE/BE/QA/Infra)
