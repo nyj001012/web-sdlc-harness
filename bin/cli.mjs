@@ -105,6 +105,7 @@ const ignoreEntriesFor = (hosts) =>
   hosts.flatMap((host) => [
     `${HOST_DIRNAME[host]}/_workspace/log/`,
     `${HOST_DIRNAME[host]}/_workspace/handoff/`,
+    `${HOST_DIRNAME[host]}/_workspace/human-gates/`,
     `${HOST_DIRNAME[host]}/_workspace/02_issues/`,
   ]);
 const IGNORE_HEADER = '# web-sdlc-harness 런타임 산출물 (재현 가능하므로 추적하지 않는다)';
