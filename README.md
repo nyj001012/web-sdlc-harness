@@ -2,7 +2,7 @@
 
 Claude Code와 Codex CLI 양쪽에서 쓸 수 있는 하네스 (풀스택 웹 개발)
 
-14개의 에이전트 페르소나와 14개의 스킬로 구성된, **애자일 SDLC 전체를 자동으로 굴리는 하네스**다. 요구사항 분석 ➔ 아키텍처 설계 ➔ 티켓팅 ➔ TDD 병렬 개발 ➔ E2E 검증 ➔ PR 생성 ➔ 문서화까지를 페이즈별 에이전트 팀으로 나눠 수행한다.
+14개의 에이전트 페르소나와 14개의 스킬로 구성된, **사용자 승인 단계와 개발 자동화를 연결하는 애자일 SDLC 하네스**다. 요구사항 확인 ➔ 아키텍처 설계 ➔ 티켓팅·계약 ➔ 테스트 명세 승인 ➔ TDD 개발 ➔ E2E 검증 ➔ PR 생성 ➔ 문서화를 수행한다. Claude Code는 팀 병렬 개발을, Codex는 순차 위임을 사용한다.
 
 패키지는 두 벌의 소스 트리를 담고 있다 — `.claude/`(Claude Code용, Phase 3 Track A에서 에이전트 팀 모드·P2P 통신 사용)와 `.codex/`(Codex CLI용, Codex의 서브에이전트가 오케스트레이터에게만 보고하는 허브-스포크 구조라 P2P 대신 순차 위임 사용). 라우팅·페이즈 골격은 같지만 실행 방식이 다르므로 설치 시 호스트를 고른다(「설치」 참고).
 
@@ -31,9 +31,9 @@ web-sdlc-harness --target ./my-project   # 이후 npx 없이 바로 실행
 전역 설치되는 것은 이 실행 파일 하나뿐이다. 에이전트·스킬 정의(`design.md` 주입 대상)는 여전히 명령을 실행한 프로젝트에만 놓인다 — 정의 파일 자체를 홈 디렉터리 등 전역 한 벌로 두면 여러 프로젝트가 서로의 `<design_spec>` 주입 결과를 덮어쓰게 되기 때문이다 (`bin/cli.mjs` 상단 설명 참고).
 
 - **기존 프로젝트에 얹는 것이 기본 사용 사례다.** 대상에 이미 있는 파일과 충돌하면 **아무것도 쓰지 않고** 목록을 보여주며 멈춘다. 전부 덮어쓰려면 `--force`.
-- `.gitignore`에 런타임 3경로를 중복 없이 덧붙인다. 기존 내용은 덮어쓰지 않는다. 이 경로는 설치한 호스트 밑(`.claude/_workspace/` 또는 `.codex/_workspace/`)이며, 호스트마다 독립이다 (「산출물 구조」 참고).
+- `.gitignore`에 런타임 4경로(`log/`·`handoff/`·`02_issues/`·`human-gates/`)를 중복 없이 덧붙인다. 기존 내용은 덮어쓰지 않는다. 이 경로는 설치한 호스트 밑(`.claude/_workspace/` 또는 `.codex/_workspace/`)이며, 호스트마다 독립이다 (「산출물 구조」 참고).
 - `update`는 선택한 호스트의 코어(`agents/`·`skills/`·`tools/`)만 교체한다. `_workspace/`의 `design.md`·계약과 `.claude/settings*.json`·`.codex/config.toml` 등은 손대지 않으며, 대상에만 있는 파일(자체 스킬 등)은 지우지 않고 보고만 한다.
-- ⚠️ `update`는 `agents/`를 교체하므로 주입 블록이 사라진다. 최신화 후 해당 호스트의 `node <호스트>/tools/inject-design.mjs`로 재주입한다.
+- ⚠️ `update`는 `agents/`를 교체하므로 주입 블록이 사라진다. 최신화 후 해당 호스트의 `inject-design.mjs`와 `inject-scenario.mjs`를 다시 실행한다. Gate 2 대상이면 승인 검사도 확인한 뒤 새 작업 세션에서 재개한다.
 
 ### Codex 지원 범위
 
@@ -60,7 +60,7 @@ cp -r /tmp/harness/tools <대상>/.codex/tools
 cp -r /tmp/harness/.agents/skills <대상>/.agents/             # Codex 스킬 (자동 탐색 경로가 다르다)
 ```
 
-이 경우 `.gitignore` 병합과 충돌 검사는 직접 해야 한다. 「산출물 구조」의 미추적 세 경로를 참고하라.
+이 경우 `.gitignore` 병합과 충돌 검사는 직접 해야 한다. 「산출물 구조」의 미추적 네 경로를 참고하라.
 
 > 저장소 루트의 `package.json`은 **하네스 배포용**이며 대상 프로젝트의 기술 스택과 무관하다. 의존성은 0개이고, 대상 프로젝트로 복사되지도 않는다. 스택은 여전히 `design.md`만이 정의한다.
 
@@ -68,11 +68,45 @@ cp -r /tmp/harness/.agents/skills <대상>/.agents/             # Codex 스킬 (
 
 1. 위 설치를 마친다.
 2. Claude Code 또는 Codex CLI에서 하고 싶은 작업을 요청한다. (예: "센서 관제 대시보드를 만들어줘", "로그인 API만 구현해줘")
-3. `run_web_sdlc`가 요청 성격에 맞는 페이즈만 골라 실행하며, 에이전트 스폰 전에 `inject-design.mjs`를 돌려 설계 명세를 주입한다.
+3. `run_web_sdlc`가 요청 성격에 맞는 페이즈를 골라 실행한다. Gate 1·2가 필요한 경우 사용자 검토를 기다리고, 승인 확인과 명세 주입을 마친 뒤 후속 역할을 시작한다.
 
 > ⚠️ 파이프라인 도중 `design.md`가 갱신되면 주입 스크립트가 에이전트 정의 파일을 다시 쓴다. 이때 Claude Code·Codex가 세션 시작 시점의 에이전트 정의를 잡고 있으면 갱신이 반영되지 않는다. 오케스트레이터는 에이전트가 반환한 `DESIGN_FINGERPRINT`로 이를 감지하며, 불일치 시 세션 재시작을 요청한다.
 
 기존 코드베이스가 있는 프로젝트라면 Phase 0에서 현행 스택을 조사해 `design.md`에 기록한 뒤 개발에 들어간다. 신규 프로젝트라면 Phase 1에서 스택을 새로 확정한다. 어느 쪽도 불가능하면 파이프라인은 추측하지 않고 멈춰서 사용자에게 스택 결정을 묻는다.
+
+### Gate 1·2: 사용자와 확정하는 두 단계
+
+| 단계 | 수행 시점과 조건 | 사용자와 확정하는 것 | 다음 단계의 확인 조건 |
+|---|---|---|---|
+| **Gate 1 — BA 요구사항 확인** | Phase 0, 아키텍처·계약 이전. Heavy에서 요구사항이 불명확하면 필수 | Gherkin 초안 전문을 검토하고 완성본 승인 | `scenario.feature` 존재, 남아 있는 `scenario.draft.feature`와 바이트 일치, Gherkin 구조 검사 통과 |
+| **Gate 2 — QA 테스트 명세 확인** | 계약 확정 직후, 테스트 코드·개발·DB 구현 이전. TDD QA가 필요한 Heavy 라우트에서 필수 | 필수 테스트 상황 입력 → 경계·예외 케이스 일괄 제안 → 포함/제외 선택 → 완성본 전문 승인 | `human-gate.mjs tests --check` 통과, 명세 재주입 및 작성 전 지문 대조 |
+
+Gate 1은 현재 요청과 일치하는 명확한 spec.md/requirements.md 또는 승인된 시나리오가 있으면 근거를 기록하고 생략할 수 있다. Fast·문서 단독·하네스 메타에서도 생략하며, Fast가 Heavy로 승격되면 다시 판별한다. Gate 2는 Fast에서 QA와 함께 생략한다. TDD QA가 없는 인프라 단독·문서 단독·하네스 메타는 생략 사유를 기록한다. Phase 2를 건너뛰는 FE/BE Heavy 라우트도 Gate 2를 Phase 3의 첫 단계에서 수행한다.
+
+BA와 CASE_REVIEW QA는 사용자와 직접 문답하는 **독립 세션**에서 실행한다. 오케스트레이터는 질문을 중계하거나 CASE_REVIEW를 서브 에이전트로 스폰하지 않고 `[WAITING_USER]`로 멈춘다. 실행 방법은 호스트별로 다르다.
+
+| 호스트 | Gate 1 | Gate 2 |
+|---|---|---|
+| Claude Code | 별도 터미널에서 `claude --agent business-analyst` 실행 | 별도 터미널에서 `claude --agent backend-qa` 또는 `frontend-qa` 실행; CASE_REVIEW로 명세 검토 |
+| Codex | 새 Codex 세션에서 `refine_requirements` 스킬 직접 실행 | 새 Codex 세션에서 `design_backend_tdd_cases` 또는 `design_frontend_tdd_cases` 스킬을 CASE_REVIEW 모드로 직접 실행 |
+
+Codex의 스킬 직접 실행은 QA TOML의 지침을 자동으로 주입받는 경로가 아니다. 오케스트레이터가 QA 안내 전에 `inject-design.mjs`로 입력을 준비하면, 독립 QA 세션은 스킬 절차에 따라 해당 QA 정의 파일의 설계·시나리오 관리 블록을 한 번 읽고 지문을 확인한다. 원본 `design.md`는 다시 읽지 않는다. Claude Code에서 스킬로 직접 문답하는 대안도 같은 입력 로딩 절차를 따른다.
+
+Gate 2는 **하나의 QA 세션이 FE/BE 전체의 명세를 맡는다.** 승인 전에는 `test-cases.draft.md`만 작성하고, 사용자가 완성본을 승인한 뒤 동일한 내용의 `test-cases.md`와 승인 영수증을 남긴다. 추가 케이스의 번호별 선택은 완성본 승인과 별개다. 사용자 승인 의미는 QA가 대화에서 판단하며, 지문 도구는 승인 발화를 해석하지 않는다.
+
+BA/QA 세션이 끝나면 원래 오케스트레이터 세션으로 돌아와 완료를 알린다. 오케스트레이터는 "BA 완료"·"QA 완료"라는 말만으로 진행하지 않고 파일 상태와 승인 검사를 확인한다. 후속 QA는 **WRITE_TESTS** 모드로 승인된 ID의 Red 테스트를 작성하고, 그 다음 개발·리뷰가 이어진다. QA 대화 원문이나 요약은 후속 역할에 전달하지 않고 확정 파일·경로·지문만 인계한다.
+
+Codex 호스트에서 승인 확인·재주입에 쓰는 명령은 다음과 같다. Claude Code에서는 경로의 `.codex`를 `.claude`로 바꾼다.
+
+```bash
+node .codex/tools/inject-scenario.mjs --sections  # Gate 1 수행 경로: 확정본·초안 비교 후 Gherkin 검사
+node .codex/tools/inject-scenario.mjs             # Gate 1 확인 후 시나리오 주입
+node .codex/tools/human-gate.mjs tests --check  # 승인 영수증과 현재 파일 대조
+node .codex/tools/inject-design.mjs            # 승인 확인 후 설계·시나리오·테스트 명세 재주입
+node .codex/tools/inject-design.mjs --check --json
+```
+
+`tests --record`는 사용자가 승인한 뒤 QA 세션만 실행한다. 요구사항·시나리오·설계·계약·테스트 명세가 바뀌면 기존 영수증은 유효하지 않아 재승인이 필요하다. 초안이 남아 있고 확정본과 바이트가 다르면 `--check`와 `--record`가 모두 실패한다. QA·개발자·DB 역할은 첫 코드 쓰기 전에 승인 검사와 현재 프롬프트의 설계·테스트 명세 지문 대조를 통과해야 한다. 디스크가 최신이어도 현재 세션의 지문이 다르면 새 세션에서 재개한다.
 
 ## 핵심 원리: 기술 스택을 전제하지 않는다
 
@@ -110,7 +144,7 @@ cp -r /tmp/harness/.agents/skills <대상>/.agents/             # Codex 스킬 (
 
 ## 설계 명세는 읽지 않고 주입한다
 
-하위 에이전트는 `design.md`를 **도구로 읽지 않는다.** 오케스트레이터가 에이전트를 스폰하기 전에 주입 스크립트를 실행하면, 설계 전문이 각 에이전트 정의 파일(`.claude/agents/<name>.md`)의 프론트매터 직후에 `<design_spec>` 블록으로 보간된다. Claude Code에서 이 본문은 그대로 서브 에이전트의 시스템 프롬프트가 된다.
+하위 에이전트는 `design.md`를 **도구로 읽지 않는다.** 오케스트레이터가 스폰 전에 주입 스크립트를 실행하면, Claude Code에서는 `.claude/agents/<name>.md`의 프론트매터 직후에, Codex에서는 `.codex/agents/<name>.toml`의 `developer_instructions` 문자열에 `<design_spec>` 블록이 들어간다. 독립 세션에서 스킬을 직접 실행하는 CASE_REVIEW는 앞 절의 입력 로딩 절차를 사용한다.
 
 | | 런타임 `Read` 방식 | 정적 주입 방식 |
 |---|---|---|
@@ -128,12 +162,14 @@ node .claude/tools/inject-design.mjs --dry-run  # 파일을 쓰지 않고 결과
 node .claude/tools/inject-design.mjs --clear    # 주입 블록 제거, 하네스 원본 복원
 ```
 
-- **재주입 시점:** Phase 0 진입 직후, `system-architect`가 `design.md`를 갱신한 직후, 사용자가 설계를 직접 수정한 직후.
-- **드리프트 방지:** 주입 블록은 `design.md`의 SHA-256 앞 12자리를 `fingerprint`로 박아둔다. 각 에이전트는 최종 보고 첫 줄에 `DESIGN_FINGERPRINT`를 반환하고, 오케스트레이터가 현재 지문과 대조한다.
+- **재주입 시점:** Phase 0 진입 직후, `system-architect`가 설계를 갱신한 직후, 독립 QA 세션 안내 전, Gate 2 승인 확인 후, 사용자가 입력 명세를 수정한 직후. 하네스 메타 라우트는 주입을 생략한다.
+- **드리프트 방지:** 주입할 설계 본문의 SHA-256 앞 12자리를 `fingerprint`로 기록한다. 템플릿 보간 결과도 지문에 반영된다. 에이전트는 `DESIGN_FINGERPRINT`를 반환하고, Gate 2 대상 QA·개발자·DB는 `TEST_CASES_FINGERPRINT`도 대조한다.
 - **주입 제외:** `system-architect`(`design.md`의 생산자이므로 낡은 사본 주입 금지)와 `release-manager`(스택 의존성 없음).
 - 주입 블록은 자동 생성 영역이다. `<!-- DESIGN_SPEC:BEGIN -->` ~ `<!-- DESIGN_SPEC:END -->` 구간을 손으로 편집하지 않는다.
 
-같은 방식으로, `business-analyst`가 사용자와 요구사항을 정제해 확정한 Gherkin 시나리오(`scenario.feature`)도 형제 스크립트 `inject-scenario.mjs`가 `system-architect`·`issue-pm`·`tech-leader`·`e2e-tester` 네 곳에만 정적 주입한다 — 단, `design.md`와 달리 시나리오 부재는 파이프라인을 막지 않고 기존 `requirements.md` 경로로 조용히 폴백한다. `e2e-tester`가 이 산출물을 받는 이유는 사용자 시나리오를 처음부터 재도출하지 않고, BA가 이미 Gherkin으로 확정한 Given/When/Then을 E2E 테스트 케이스의 1차 근거로 그대로 쓰기 위함이다.
+`inject-scenario.mjs`는 BA가 승인받은 `scenario.feature`를 `system-architect`·`issue-pm`·`tech-leader`·`e2e-tester` 네 곳에 정적 주입한다. 시나리오가 없을 때 spec.md/requirements.md로 폴백하는 것은 **Gate 1을 생략한 경로에서만** 허용된다. Gate 1 수행 경로에서는 확정본과 구조 검사를 확인하기 전까지 설계·계약에 진입하지 않는다. `e2e-tester`는 이 시나리오를 사용자 흐름 검증의 1차 근거로 사용한다.
+
+`inject-design.mjs`는 설계 또는 대상 에이전트 본문의 `{{GHERKIN_SCENARIO}}`와 `{{TEST_CASES}}`도 확정 파일로 채운다. QA는 시나리오와 테스트 명세를, 개발자·DB는 테스트 명세를 받는다. 초안은 주입하지 않는다. 주입·갱신·삭제 감지와 `--clear` 복원은 관리 블록으로 추적하며, `--json`의 `humanGateInputs`에서 입력별 준비 상태와 지문을 확인한다.
 
 ## 🚀 에이전트 오케스트레이션 파이프라인 (Pipeline Architecture)
 
@@ -146,17 +182,19 @@ node .claude/tools/inject-design.mjs --clear    # 주입 블록 제거, 하네�
 %%{init: {'theme': 'neutral', 'config': {'useMaxWidth': true}}}%%
 graph TD
     P0[Phase 0: 진입 검사] -->|Fast 트랙| P2_F[Phase 2: Fast PM]
-    P0 -->|Heavy 트랙| P1_BA[Phase 1 선행: BA 요구사항 정제]
-    P1_BA --> P1[Phase 1: 아키텍트 SSOT]
+    P0 -->|Heavy: 요구사항 확인 필요| G1[Gate 1: BA 독립 세션 · 사용자 승인]
+    P0 -->|Heavy: 명확한 요구사항 · 생략 근거 기록| P1[Phase 1: 아키텍트 SSOT]
+    G1 -->|확정 시나리오 검사 통과| P1
 
     %% Fast Track
     P2_F --> P3_F[Phase 3: Fast 구현 & 리뷰]
     P3_F -->|성공| P5[Phase 5: 릴리스 & 문서화]
-    P3_F -->|반려 2회 초과 시 Heavy 승격| P1
+    P3_F -->|반려 2회 시 Heavy 승격 · 게이트 재판별| P0
 
     %% Heavy Track
     P1 --> P2_H[Phase 2: 티켓팅 & 계약 수립]
-    P2_H --> P3_H[Phase 3: 멀티 트랙 병렬 개발]
+    P2_H --> G2[Gate 2: QA CASE_REVIEW · 사용자 승인]
+    G2 -->|영수증 확인 · 명세 주입| P3_H[Phase 3: WRITE_TESTS → 구현 → 리뷰]
     P3_H --> P4[Phase 4: E2E 통합 테스트]
     P4 -->|성공| P5
     P4 -->|실패 시 Pinpoint 재스폰| P3_H
@@ -168,14 +206,16 @@ graph TD
 
 | Phase | 하는 일 | 투입 에이전트 |
 |---|---|---|
-| **0** | 컨텍스트 분석 · 라우팅 · **난이도 판별** · **설계 명세 주입** · 스택 확보 선행 검사 | (오케스트레이터) |
-| **1** | (선행, 조건부) 요구사항 정제 · Gherkin 시나리오 확정<br>아키텍처 및 기술 스택 확정 | `business-analyst`(조건부), `system-architect` |
-| **2** | 이슈 생성 · 작업 브랜치 파생 · 인터페이스 계약 설계 | `issue-pm`, `tech-leader` |
-| **3** | Track A: TDD 병렬 개발 (테스트 선행 → 구현 → 리뷰 핑퐁)<br>Track B: 인프라 · CI/CD | `backend-qa`, `backend-developer`, `db-engineer`, `frontend-qa`, `frontend-developer`, `code-reviewer`, `devops-engineer` |
+| **0** | 컨텍스트 분석 · 라우팅 · 난이도 판별 · 스택 확보·주입<br>조건부 Gate 1: 요구사항 완성본 사용자 승인 | 오케스트레이터, `business-analyst` 독립 세션(조건부) |
+| **1** | Gate 1 확인 또는 생략 근거 기록 후 아키텍처·기술 스택 확정 | `system-architect` |
+| **2** | 이슈 생성 · 작업 브랜치 파생 · 계약 설계<br>Gate 2: 테스트 명세 사용자 승인 | `issue-pm`, `tech-leader`, CASE_REVIEW QA 독립 세션 |
+| **3** | Gate 2 확인 후 WRITE_TESTS → 구현 → 리뷰<br>Claude: 팀 병렬 개발, Codex: 순차 위임<br>인프라·CI/CD는 전체 구축에서 Gate 2 확인 후 착수 | `backend-qa`, `backend-developer`, `db-engineer`, `frontend-qa`, `frontend-developer`, `code-reviewer`, `devops-engineer` |
 | **4** | 실행 환경에서 사용자 시나리오 통합 검증 · **에러 로그 트리아지** | `e2e-tester` |
 | **5** | 원격 Push · PR/MR 생성 · 위키 문서화 | `release-manager`, `tech-writer` |
 
 라우팅은 **두 축**으로 정해진다.
+
+위 그림은 전체 구축을 기준으로 한다. FE/BE 단독 Heavy처럼 Phase 1·2를 생략하는 라우트는 필요한 승인 게이트를 Phase 3 이전에 수행한다.
 
 - **라우트** — 어느 페이즈를 도는가. (전체 구축 / FE 단독 / BE 단독 / 인프라 단독 / 문서 단독 / 하네스 메타). 라우트 6개는 **상호 배타적 선택**이다 — 동시에 갈라지는 분기가 아니라 필요한 페이즈의 부분집합을 고르는 스위치다.
 - **난이도** — 그 페이즈를 얼마나 무겁게 거치는가. (Fast는 가볍고 빠르게 거치고, Heavy는 무겁게 거친다.) 라우트 위에 겹치는 **두 번째 스위치**로, 고른 페이즈 집합의 무게를 다시 조정한다.
@@ -194,7 +234,7 @@ graph TD
 
 ### 2. Phase 3 상세 아키텍처 (Heavy Track Details)
 
-Heavy 트랙 진입 시, **Track A(팀 협업)**와 **Track B(DevOps 고립)**가 서로 모른 채 나란히 진행된다.
+아래 그림의 병렬 실행은 **Claude Code 호스트의 Heavy 트랙**을 나타낸다. Gate 2 확인 후 Track A(팀 협업)와 Track B(DevOps 고립)가 진행된다. Codex는 같은 역할을 순차 위임하며, 각 레인은 파일 소유권 구분을 뜻한다.
 
 - **Track A:** FE/BE/DB 레인이 계약 기반으로 움직이며, 변경 완료 후 `code-reviewer`로 수렴(Fan-in)한다. (반려 시 최대 3회 순환)
 - **Track B:** `devops-engineer`가 독자적으로 인프라 작업을 수행한다.
@@ -265,14 +305,14 @@ graph TD
 
 ### 명세와 강제의 구분
 
-위 팬인 구조는 에이전트 정의의 `연결:` 규약과 페이즈 진입 조건으로 **서술**돼 있으며, 이를 검사하는 기계적 게이트는 없다. Phase 4가 양쪽 완료를 기다리는 것도 오케스트레이터가 지키는 규칙이지 자동 차단 장치가 아니다. 자동 검증이 붙어 있는 곳은 주입기 계약·배포 오염 차단·SSOT 재열람 차단, 세 곳이다.
+위 팬인 구조와 Phase 4 진입 조건은 오케스트레이터가 지키는 규칙이다. Gate 2에는 별도의 지문 검사가 있으며, `human-gate.mjs`가 영수증 누락·입력 변경·초안과 확정본 불일치를 exit 1로 검출한다. 이 도구는 사용자의 승인 의사를 판단하지 않는다. 승인 뒤 영수증을 기록하는 책임과 검사 실패 시 후속 역할을 시작하지 않는 책임은 각각 QA와 오케스트레이터에 있다. 주입기 검사·배포 오염 검사·SSOT 재열람 훅의 역할과도 구분한다.
 
 `design.md`·`scenario.feature`는 하네스가 소비 대상 에이전트의 시스템 프롬프트에 이미 전문을 정적 주입하지만(「설계 명세는 읽지 않고 주입한다」 참고), 에이전트 정의 안의 "도구로 다시 읽지 마라"는 규약은 프롬프트 텍스트일 뿐 강제력이 없었다. `PreToolUse`/`SessionStart` 훅(`.claude/tools/web-sdlc-harness-guard-ssot-read.mjs`·`web-sdlc-harness-check-injection-drift.mjs`, `.codex/`에도 동일 포트)이 이 재열람 시도를 실제로 차단하고, 주입 드리프트를 세션 시작마다 경고한다.
 
 > ⚠️ **Codex 호스트의 알려진 제약:** Codex CLI의 hooks 스키마(`.codex/hooks.json`)는 공식 문서(learn.chatgpt.com/docs/hooks) 그대로 구현했지만, 이 글 작성 시점 기준 **네이티브 Windows에서는 스키마만 인식될 뿐 실제로 도구 호출을 차단하지 않는 것을 직접 확인했다** — 업스트림에도 같은 증상의 이슈가 열려 있다([openai/codex#17478](https://github.com/openai/codex/issues/17478)). macOS·Linux·WSL에서는 정상 작동할 것으로 예상되나 별도로 검증하지는 못했다. 이 이슈가 해결되면 하네스 쪽 수정 없이 그대로 작동한다.
 
 ```bash
-node --test tools/inject-design.test.mjs          # 주입기 회귀 테스트 (모드 계약·멱등성·줄바꿈 보존)
+npm test                                        # 설계·시나리오 주입, Gate 2 승인 지문, 호스트 도구 사본 동기화 검사
 node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입 블록·런타임 경로·의존성)
 ```
 
@@ -290,13 +330,13 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 
 | 에이전트 | 역할 | 모델 |
 |---|---|---|
-| `business-analyst` | 사용자와 질의응답으로 요구사항을 정제해 Gherkin 시나리오 확정 (Phase 1 선행, 조건부) | sonnet |
+| `business-analyst` | Phase 0 Gate 1 독립 세션에서 요구사항 문답·Gherkin 완성본 사용자 승인 | sonnet |
 | `system-architect` | 기술 스택·구조·규약·소유권 확정, 도메인 경계 설계 | opus |
 | `issue-pm` | 마이크로 태스크 분할, GitHub/GitLab 이슈 생성, 작업 브랜치 파생 | haiku |
 | `tech-leader` | FE/BE/QA가 병렬 개발할 수 있는 인터페이스 계약 설계 | sonnet |
-| `frontend-qa` | UI 렌더링·이벤트·폴백에 대한 실패하는(Red) 테스트 선행 작성 | sonnet |
+| `frontend-qa` | CASE_REVIEW에서 테스트 명세 사용자 승인 확인, WRITE_TESTS에서 승인된 UI 케이스의 Red 테스트 작성 | sonnet |
 | `frontend-developer` | 계약과 테스트를 만족하는 UI·클라이언트 상태 구현 | sonnet |
-| `backend-qa` | API·비즈니스 로직의 블랙박스 테스트 선행 작성 | sonnet |
+| `backend-qa` | CASE_REVIEW에서 테스트 명세 사용자 승인 확인, WRITE_TESTS에서 승인된 서버 케이스의 Red 테스트 작성 | sonnet |
 | `backend-developer` | 계층 분리·트랜잭션·구조화 로깅을 지킨 서버 로직 구현 | sonnet |
 | `db-engineer` | 스키마·마이그레이션·인덱스·시드 구현 (데이터 계층 소유자) | sonnet |
 | `code-reviewer` | 계약·규약·보안·성능 검수, 승인/반려 게이트키퍼 | sonnet |
@@ -314,8 +354,8 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 | `design_system_architecture` | 기술 스택 선정 및 시스템 설계 |
 | `create_agile_issues` | 이슈 생성 및 작업 브랜치 파생 |
 | `design_interface_contracts` | 풀스택 인터페이스·데이터 계약 설계 |
-| `design_frontend_tdd_cases` | UI TDD 케이스 설계 |
-| `design_backend_tdd_cases` | 서버 블랙박스 TDD 케이스 설계 |
+| `design_frontend_tdd_cases` | CASE_REVIEW 명세 사용자 승인 확인 또는 WRITE_TESTS UI Red 테스트 작성 |
+| `design_backend_tdd_cases` | CASE_REVIEW 명세 사용자 승인 확인 또는 WRITE_TESTS 서버 Red 테스트 작성 |
 | `implement_frontend_ui` | UI·클라이언트 상태 구현 |
 | `implement_backend_api` | 서버 API·비즈니스 로직 구현 |
 | `perform_code_review` | 코드 리뷰 및 보안·성능 감사 |
@@ -335,10 +375,13 @@ node bin/cli.mjs --preflight                      # 배포 오염 검사 (주입
 └── bin/cli.mjs                    # npx 스캐폴더 (init / update / --preflight / --claude / --codex)
 
 tools/                             # 어느 호스트에도 속하지 않는 유일한 원본. 설치 시 두 호스트 각자의 tools/로 복사된다
-├── inject-design.mjs              # design.md ➔ 에이전트 시스템 프롬프트 정적 주입기
+├── inject-design.mjs              # 설계 주입 및 확정 시나리오·테스트 명세 템플릿 보간
 ├── inject-design.test.mjs         # 주입기 회귀 테스트 (node --test)
 ├── inject-scenario.mjs            # scenario.feature ➔ system-architect·issue-pm·tech-leader·e2e-tester 정적 주입기 (BA 산출물, 부재는 비차단)
-└── inject-scenario.test.mjs       # 시나리오 주입기 회귀 테스트 (node --test)
+├── inject-scenario.test.mjs       # 시나리오 주입기 회귀 테스트 (node --test)
+├── human-gate.mjs                 # Gate 2 승인 영수증 기록·지문 검사 (승인 발화는 해석하지 않음)
+├── human-gate.test.mjs            # 승인 누락·변경·미확정 초안 차단 회귀 테스트
+└── host-sync.test.mjs             # 두 호스트의 도구 사본과 tools/ 원본 일치 검사
 
 (설치되는 두 호스트 — 설치 옵션에 따라 한쪽 또는 둘 다)
 .claude/{agents,skills,tools}/     # Claude Code용(Markdown+YAML). Track A에 P2P 팀 모드 사용. tools/는 위 원본의 사본
@@ -348,26 +391,32 @@ tools/                             # 어느 호스트에도 속하지 않는 유
 <호스트>/_workspace/                 # 설치한 호스트(.claude 또는 .codex) 밑에 독립적으로 생긴다
 │
 ├── (추적) 합의물 — 커밋 대상
-│   ├── 00_scenario/scenario.feature # BA가 확정한 Gherkin 요구사항 (조건부 — BA 단계를 거를 수도 있다)
+│   ├── 00_scenario/scenario.feature # Gate 1에서 사용자 승인 후 저장한 Gherkin 요구사항 (조건부)
 │   ├── 01_architecture/design.md  # 기술 스택·규약·소유권 (그 호스트의 SSOT)
 │   ├── 03_contracts/              # 인터페이스 계약 (형식은 design.md가 정함)
+│   ├── 04_test_cases/test-cases.md # Gate 2 승인 후 확정한 테스트 명세
 │   └── 04_infrastructure/         # 설치·배포 스크립트
+│
+├── (승인 전) 초안 — 주입 입력에서 제외; 자동 무시 대상 아님
+│   ├── 00_scenario/scenario.draft.feature
+│   └── 04_test_cases/test-cases.draft.md # 확정본과 다르면 Gate 2 차단
 │
 └── (미추적) 런타임 산출물 — .gitignore 대상
     ├── 02_issues/issue_report.md  # 티켓 생성 리포트 (실제 SSOT는 GitHub/GitLab의 이슈)
     ├── handoff/phase-<N>.md       # 페이즈 인계 파일 (Rule 6)
+    ├── human-gates/tests.json     # Gate 2 승인 상태·지문·경로·기록 시각 (대화는 저장하지 않음)
     └── log/orchestrator-log.jsonl # 페이즈 감사 로그
 ```
 
 `--claude` 단독 설치에서는 `.codex/` 디렉터리가, `--codex` 단독 설치에서는 `.claude/` 디렉터리가 아예 생기지 않는다. 두 호스트를 함께 설치하면 `.claude/_workspace/`와 `.codex/_workspace/`가 각각 따로 생긴다 — `design.md`도 호스트마다 독립이므로, 한 프로젝트에서 Claude로 설계하고 Codex로 이어받는 흐름은 지원하지 않는다. 호스트를 바꿔 같은 설계를 이어 쓰려면 그 호스트에서 Phase 1을 다시 돌리거나 `_workspace/`를 수동으로 복사해야 한다.
 
-미추적 세 경로는 세션마다 새로 생기고 재현 가능한 휘발성 상태다. 스테이징하거나 커밋하지 않는다.
+미추적 네 경로는 설치기가 `.gitignore`에 추가한다. 스테이징하거나 커밋하지 않는다. 새 세션에서 재개할 때 Gate 2 영수증이 없거나 입력이 바뀌었다면 QA 독립 세션에서 다시 승인받는다. `scenario.draft.feature`와 `test-cases.draft.md`는 자동 무시 경로가 아니지만, 승인된 합의물과 구분해 관리하며 주입 입력으로 사용하지 않는다.
 
 - **페이즈 인계 파일(`handoff/`)** — 오케스트레이터 컨텍스트가 요약되거나 세션이 끊겨도 인계가 끊기지 않게, 페이즈 경계에서 다음 페이즈가 필요한 사실만 40줄 이내로 남긴다. 설계서·계약·소스의 본문을 옮겨 담지 않고 경로만 적는다. 재개 시에는 **가장 높은 번호 하나만** 읽는다.
 
 ## 설계 원칙
 
-- **클린 룸 TDD** — QA는 구현 코드를 열람하지 않고 계약만 보고 실패하는 테스트를 먼저 짠다. 개발자는 테스트를 **단 한 줄도 수정할 수 없고** 프로덕션 코드로만 통과시킨다.
+- **클린 룸 TDD** — QA는 구현 코드를 열람하지 않고 요구사항·설계·계약에서 테스트 명세를 도출해 사용자 승인 후 Red 테스트를 작성한다. 개발자는 테스트를 **단 한 줄도 수정할 수 없고** 프로덕션 코드로만 통과시킨다.
 - **QA→Developer는 순차 게이팅** — Track A 팀 모드가 QA와 Developer를 동시에 스폰하더라도, 이 둘은 FE 레인 ↔ BE 레인처럼 병렬화할 대상이 아니라 TDD 순서(Red 먼저)에 따른 순차 의존 관계다. Developer는 QA의 "Red 테스트 작성 완료" `SendMessage`를 받기 전에는 구현에 착수하지 않는다.
 - **부분 수정은 `Edit`, `Write`는 신규 생성 전용** — `Write`는 기존 파일에 대해 손실 연산이다(재현되지 않은 부분이 조용히 사라진다). 전체 재작성은 diff를 파일 전체로 부풀려 리뷰 게이트를 무력화하기도 한다. 에이전트 `tools`와 대응 스킬의 `allowed-tools`는 함께 갱신한다 — 한쪽에만 `Edit`가 있으면 스킬이 활성인 동안 도구가 좁혀진다.
 - **역할별 쓰기 소유권** — 각 에이전트는 `design.md`의 소유권 표에서 자기에게 배정된 경로만 수정한다. 리뷰어는 경계 위반을 검수 항목으로 확인한다.
