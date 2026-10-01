@@ -13,6 +13,7 @@ allowed-tools:
 
 
 ## Gate 2 — QA와 사용자 테스트 명세 확정 (테스트 코드 작성 전)
+- **독립 세션 입력 로딩 (CASE_REVIEW 전용):** 스킬 직접 실행은 `.claude/agents/backend-qa.md`의 시스템 프롬프트 본문을 자동으로 주입받는 경로가 아니다. 먼저 `node .claude/tools/inject-design.mjs --check --json`의 exit 0과 `designReady: true`를 확인하고, 해당 QA 정의 파일의 `DESIGN_SPEC` 및 `HUMAN_GATE_GHERKIN_SCENARIO` 관리 블록 전문을 읽어 이 세션의 검토 입력으로 로드한다. 이 파일 읽기는 CASE_REVIEW 독립 세션의 최초 입력 로딩에만 허용하며 시스템 프롬프트에 주입됐다고 주장하지 않는다. 원본 `design.md`는 읽지 않는다. 로드 후 같은 읽기 전용 검사를 다시 실행해 출력의 `fingerprint`와 로드한 `design_spec` 지문, `humanGateInputs`의 `GHERKIN_SCENARIO` 지문과 로드한 시나리오 관리 블록 지문을 각각 대조한다. 검사 실패·설계 누락·`none`·지문 불일치면 `[WAITING USER]`로 중단하고 오케스트레이터의 재주입 후 새 세션에서 재개한다. 시나리오가 없는 경우는 Gate 1 생략 근거가 인계 파일에 기록된 경로에서만 spec.md/requirements.md로 폴백한다. 시나리오가 있어도 블록이 없으면 입력 누락으로 중단한다. 계약은 `03_contracts/`에서 직접 읽으며, 프로덕션 코드는 읽지 않는다.
 - **두 실행 모드:** CASE_REVIEW는 사용자 협업으로 명세만 작성한다. WRITE_TESTS는 승인된 명세를 읽고 Red 테스트 코드를 작성한다. 승인 전 기존의 테스트 작성/Red 알림 절차를 실행하지 않는다. 독립 호출도 유효한 승인이 없으면 CASE_REVIEW로 시작한다.
 - **담당자:** 하나의 QA 독립 세션이 FE/BE 레인 전체의 케이스를 맡는다. 사용자가 `claude --agent backend-qa` 또는 `claude --agent frontend-qa`로 실행하며(모드를 지정하지 않으면 CASE_REVIEW), 그 세션만 .claude/_workspace/04_test_cases/test-cases.md를 수정한다. 다른 레인의 경계 조건도 이 세션이 계약에서 직접 추출하고, QA 세션을 동시에 여러 개 열지 않는다.
 - **직접 입력:** 이 세션은 오케스트레이터를 거치지 않고 사용자와 **직접** 문답한다(P2P). 먼저 사용자에게 "어떤 상황을 반드시 테스트했으면 좋겠나요?"라고 묻고 답변을 기다린다. "추가 요구 없음"도 명시적 답변이며 무응답으로 대체하지 않는다. 이후 배치 질의도 이 세션에서 사용자에게 직접 한다. 이 스킬을 메인 대화에서 실행하는 경우에도 같은 방식으로 사용자에게 직접 묻는다. 다만 문답이 그 대화 컨텍스트에 남으므로 종료 후 `/clear`(또는 새 세션)로 시작한다. 서브 에이전트로 실행되면 사용자와 대화할 수 없으므로 진행하지 말고 `[WAITING USER]`로 독립 세션 실행을 요청한다.
@@ -26,7 +27,8 @@ allowed-tools:
 - 테스트 명세·요구사항·시나리오·설계·계약 변경 시 재승인한다. 테스트 코드의 설명/이름에 케이스 ID를 대응시킨다. 승인 후 추가로 발견한 케이스도 다음 배치로 확인하고 명세를 갱신·재승인한다. 승인 범위 밖 테스트를 몰래 추가하지 않는다.
 
 - **승인 판단 경계:** 사용자 응답은 대화 문맥에서 판단한다. 승인 문구 판별 함수·정규식을 사용하지 않고, human-gate 도구는 지문 기록·검증만 수행한다. 세션 종료를 호스트 채팅 기록의 물리적 삭제라고 주장하지 않는다.
-- **정적 입력:** CASE_REVIEW는 아래 Gherkin과 계약으로 경계 조건을 추출한다. WRITE_TESTS는 아래 확정 테스트 명세의 ID만 테스트로 구현한다. 템플릿이 미주입 상태면 WRITE_TESTS를 시작하지 않고 [WAITING USER]로 보고한다. CASE_REVIEW의 미승인 제안은 테스트 코드로 작성하지 않는다.
+- **정적 입력:** CASE_REVIEW는 위 입력 로딩으로 확보한 설계·시나리오와 계약으로 경계 조건을 추출한다. WRITE_TESTS는 QA 서브 에이전트에 주입된 확정 테스트 명세의 ID만 테스트로 구현한다. 스킬 파일 자체에는 명세를 주입하지 않는다. 템플릿이 미주입 상태면 WRITE_TESTS를 시작하지 않고 [WAITING USER]로 보고한다. CASE_REVIEW의 미승인 제안은 테스트 코드로 작성하지 않는다.
+- **WRITE_TESTS 작성 전 검사:** 첫 테스트 파일 쓰기 전에 `node .claude/tools/human-gate.mjs tests --check`와 `node .claude/tools/inject-design.mjs --check --json`의 exit 0을 모두 확인한다. 주입 검사 결과의 `designReady: true`, `fingerprint`와 현재 프롬프트의 `design_spec` 지문 일치, `humanGateInputs`의 `TEST_CASES` 항목의 `ready: true` 및 현재 프롬프트의 `HUMAN_GATE_TEST_CASES` 관리 블록 지문 일치를 모두 요구한다. 지문 누락·`none`·불일치 또는 검사 실패면 테스트를 쓰지 않고 `[WAITING USER]`로 새 세션에서 재개하도록 요청한다. 디스크가 최신이어도 현재 프롬프트가 최신이라는 뜻은 아니다. 승인 도구의 원문 SHA-256과 주입기의 지문은 서로 직접 비교하지 않는다. WRITE_TESTS는 디스크의 QA 정의 파일을 다시 읽어 현재 프롬프트를 대체하지 않는다. 두 읽기 전용 검사 명령을 허용하며 Node 실행 불가 등 환경 오류는 원인을 보고한다.
 
 ## Workflow (작업 순서)
 

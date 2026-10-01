@@ -229,6 +229,7 @@ allowed-tools:
 - **정적 주입:** tests --check 통과 후 `node .claude/tools/inject-design.mjs`를 재실행하고 `--check`로 최신성을 확인한다. 주입기는 `{{GHERKIN_SCENARIO}}`에 승인된 scenario.feature, `{{TEST_CASES}}`에 확정 test-cases.md를 넣는다. --json의 humanGateInputs에서 지문을 확인한다. 개발자·DB 역할을 스폰할 때 현재 DESIGN_FINGERPRINT와 TEST_CASES_FINGERPRINT 값만 전달하고(명세 전문은 전달하지 않는다), 첫 코드 쓰기 전에 읽기 전용 --check --json 결과와 프롬프트의 설계·테스트 관리 블록 지문을 모두 대조하도록 한다. 최종 보고의 TEST_CASES_FINGERPRINT도 현재 주입 지문과 대조한다. 불일치/누락이면 새 컨텍스트 또는 새 세션에서 재개하며 명세 전문을 스폰 프롬프트로 중복 전달하지 않는다.
 
 ### Phase 3: 병렬 개발 트랙 (FE/BE/QA/Infra)
+- **WRITE_TESTS 지문 인계:** `backend-qa`·`frontend-qa`를 WRITE_TESTS로 스폰할 때도 현재 `DESIGN_FINGERPRINT`와 주입기 기준 `TEST_CASES_FINGERPRINT`를 전달한다. 첫 테스트 파일 쓰기 전에 QA가 승인 검사와 읽기 전용 주입 검사 결과를 현재 프롬프트의 두 지문과 대조하도록 한다. QA의 최종 보고 지문도 현재 주입 지문과 대조한다. 누락·불일치면 후속 개발자 호출을 중단하며, 디스크의 QA 정의를 다시 읽어 현재 프롬프트를 대체하는 방식으로 우회하지 않는다.
 - **착수 조건:** Gate 2 대상 라우트는 tests --check 통과가 필수다. QA의 테스트 작성과 구현 역할 호출에 앞서 검사하고 승인된 test-cases.md를 명시적으로 인계한다.
 - Track A (앱 구현): 선택된 라우트에 맞춰 `backend-qa`, `backend-developer`, `db-engineer`, `frontend-qa`, `frontend-developer`, `code-reviewer` agent type 중 필요한 역할을 정확히 명시해 스폰하고 P2P 핑퐁 개발을 진행한다. Track A는 **FE 레인 ∥ BE 레인 ∥ 데이터 레인**으로 갈라진다.
 - ⭐️ **데이터 레인 투입 조건:** 스키마·마이그레이션·시드 변경이 있을 때만 `db-engineer`를 스폰한다. 변경이 없으면 스폰하지 않는다.

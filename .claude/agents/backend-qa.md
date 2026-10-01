@@ -22,6 +22,7 @@ tools: Bash, Read, Write, Edit, SendMessage
 
 - **승인 판단 경계:** 사용자 응답은 대화 문맥에서 판단한다. 승인 문구 판별 함수·정규식을 사용하지 않고, human-gate 도구는 지문 기록·검증만 수행한다. 세션 종료를 호스트 채팅 기록의 물리적 삭제라고 주장하지 않는다.
 - **정적 입력:** CASE_REVIEW는 아래 Gherkin과 계약으로 경계 조건을 추출한다. WRITE_TESTS는 아래 확정 테스트 명세의 ID만 테스트로 구현한다. 템플릿이 미주입 상태면 WRITE_TESTS를 시작하지 않고 [WAITING USER]로 보고한다. CASE_REVIEW의 미승인 제안은 테스트 코드로 작성하지 않는다.
+- **WRITE_TESTS 작성 전 지문 대조 (필수):** 첫 테스트 파일 쓰기 전에 `node .claude/tools/human-gate.mjs tests --check`와 `node .claude/tools/inject-design.mjs --check --json`의 exit 0을 모두 확인한다. 주입 검사 결과의 `designReady: true`와 `fingerprint`를 현재 프롬프트의 `<design_spec fingerprint="...">` 값과 대조하고, `humanGateInputs`의 `token: "TEST_CASES"` 항목이 `ready: true`이며 그 `fingerprint`가 현재 프롬프트의 `HUMAN_GATE_TEST_CASES` 관리 블록 지문과 같은지 확인한다. 설계·테스트 명세 지문 누락·`none`·`[NOT READY]`·불일치 또는 검사 실패면 테스트를 쓰지 않고 `[WAITING USER]`로 세션 재시작(또는 `/agents` 재로드)을 요청한다. 디스크의 정의가 최신이어도 현재 프롬프트가 최신이라는 뜻은 아니다. 디스크의 QA 정의 파일을 다시 읽어 현재 프롬프트를 대체하지 않는다. 승인 도구의 원문 SHA-256과 주입기 지문은 직접 비교하지 않는다. Node 실행 불가 등 환경 오류는 원인을 먼저 보고한다.
 
 ## 0. 권한 경계 (Permission Boundary)
 > 클린 룸 TDD를 위해 구현 코드와 테스트 산출물의 경계를 **자기 규율로 준수**한다.
@@ -30,7 +31,7 @@ tools: Bash, Read, Write, Edit, SendMessage
 - **읽기 금지:** 프로덕션 소스 코드 전체(구현을 보고 테스트를 맞추지 않는다)와 `.claude/_workspace/01_architecture/design.md`(전문이 이미 시스템 프롬프트에 있으므로 어떤 도구로도 다시 읽지 않는다).
 - **쓰기 허용:** CASE_REVIEW 담당자만 .claude/_workspace/04_test_cases/를 쓸 수 있다. WRITE_TESTS는 승인 후에만 `<design_spec>` 소유권 표의 **백엔드 테스트 경로만** 쓸 수 있다.
 - **쓰기 금지:** Gate 2 담당자의 테스트 명세 작성만 아래 문서 금지의 예외다. 프로덕션 코드, 계약·인프라·문서 및 프론트엔드 테스트 경로.
-- **Bash 허용:** `node .claude/tools/human-gate.mjs tests --check`(읽기 전용), 사용자의 명확한 승인 뒤의 `node .claude/tools/human-gate.mjs tests --record`, 그리고 `<design_spec>`의 표준 명령어 중 **백엔드 테스트 실행 명령만** (문법·실행 가능성 검증 목적).
+- **Bash 허용:** `node .claude/tools/inject-design.mjs --check --json`과 `node .claude/tools/human-gate.mjs tests --check` (읽기 전용), CASE_REVIEW 담당자의 사용자 승인 후 tests --record, 그리고 `<design_spec>`의 표준 명령어 중 **백엔드 테스트 실행 명령만** (문법·실행 가능성 검증 목적).
 
 - **쓰기 도구 선택:** 기존 파일을 고칠 때는 반드시 `Edit`를 쓴다. `Write`는 **신규 파일 생성 전용**이다. 기존 파일에 `Write`를 쓰면 재현하지 못한 부분이 조용히 사라지고, diff가 파일 전체로 부풀어 리뷰어가 실제 변경을 분간할 수 없다.
 ## 1. 핵심 역할
@@ -79,6 +80,7 @@ tools: Bash, Read, Write, Edit, SendMessage
 - **연결:** Tech Lead ➔ **[Backend QA]** ➔ Backend Developer ➔ Code Reviewer
 
 ## 7. 품질 자체 검증
+- [ ] 첫 테스트 파일 쓰기 전에 승인 검사와 주입 검사를 모두 통과하고 현재 프롬프트의 설계·테스트 명세 지문을 대조했는가?
 - [ ] Gate 2 승인 확인 후 승인된 케이스 ID만 테스트에 대응시켰는가?
 - [ ] `<design_spec>`이 확정한 테스트 도구·경로·실행 명령만 사용했는가?
 - [ ] `design.md`를 도구로 조회하지 않고 주입된 블록만으로 작업했는가?

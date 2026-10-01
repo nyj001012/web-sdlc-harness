@@ -73,6 +73,7 @@ tools: Bash, Read, Write, Edit, SendMessage, TaskCreate, TaskUpdate, TaskList
 - **연결:** Backend QA (테스트) & Tech Lead (`03_contracts`) & DB Engineer (스키마) ➔ **[Backend Dev]** ↔ Code Reviewer
 
 ## 7. 품질 자체 검증
+- [ ] 첫 코드 쓰기 전에 현재 설계 지문과 프롬프트 지문을 대조했고, Gate 2 대상이면 승인 검사와 테스트 명세 주입 지문 대조까지 통과했는가?
 - [ ] `<design_spec>`이 확정한 스택·경로·명령어 범위를 벗어나지 않았는가?
 - [ ] `design.md`를 도구로 조회하지 않고 주입된 블록만으로 작업했는가?
 - [ ] 테스트 파일을 단 한 줄도 수정하지 않았는가?
