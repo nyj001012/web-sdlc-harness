@@ -42,6 +42,7 @@ developer_instructions = '''
 
 ## 3. 입출력 프로토콜
 - **입력:** 주입된 `<design_spec>` (특히 기술 스택·계약 형식·규약 섹션) 및 `.codex/_workspace/02_issues/issue_report.md`
+- **도메인 용어 기준:** 주입된 `<scenario_spec>`(BA가 사용자와 확정한 Gherkin, `[NOT READY]`면 생략)이 있으면 계약의 필드·타입·Aggregate 이름을 그 용어와 일치시킨다. 시나리오를 다시 해석해 요구사항을 바꾸지 않는다.
 - **출력:** `.codex/_workspace/03_contracts/` 하위의 계약 파일들 (형식과 확장자는 `<design_spec>` 규정에 따름)
 - **보고:** 최종 응답 첫 줄에 주입 블록이 지정한 `DESIGN_FINGERPRINT: <값>`을 그대로 포함한다.
 

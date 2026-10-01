@@ -11,6 +11,8 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 
 ## 📌 Orchestration Rules (절대 준수 규칙)
 
+**Gate 1 예외:** 아래 일반 서브 에이전트 보고 규칙보다 사용자 검토 게이트가 우선한다. BA 문답은 사용자와의 전용 채널/세션에서 직접 진행하고 오케스트레이터에는 확정 파일 상태만 보고한다.
+
 1. **서브 에이전트 위임 (허브-스포크, Codex)**
    - ⭐️ **팀 모드는 쓰지 않는다.** Codex 서브에이전트는 위임받은 작업을 마치면 오케스트레이터에게 결과를 보고하고 종료하는 구조뿐이며, 팀원끼리 상시 채널을 유지하며 서로 직접 호출하는 기능이 없다. 그래서 이 하네스가 Claude Code에서 Heavy 트랙 Track A에 쓰는 QA↔Developer↔Reviewer↔DB 팀 핑퐁은 Codex에서 **순차 위임으로 대체**한다 (Phase 3 참고).
    - ⭐️ **모든 역할은 서브 에이전트다.** 위임받은 작업을 마치면 스스로 종료되므로 다른 역할을 직접 부를 수 없다. 다음 역할에 전달할 내용은 **최종 보고에 담게 하고, 오케스트레이터가 그것을 읽어** 필요한 역할을 새로 위임한다.
@@ -46,12 +48,12 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
        - ⛔ **단, 주입 명령이 애초에 실행되지 못한 경우에는 이 진단을 적용하지 마라.** Node가 없어 `exit 127`로 죽었다면 세션을 몇 번 재시작해도 지문은 생기지 않는다. Phase 0의 런타임 선행 검사를 건너뛰었는지 먼저 확인하고, 그렇다면 환경 문제로 보고한다.
    - 🚫 하위 에이전트가 주입 블록에 없는 프레임워크·도구·명령어를 사용하려 하면 즉시 중단시키고, 아키텍처를 갱신(➔ 재주입)하거나 사용자에게 질의한다.
    - 🚫 `system-architect`와 `release-manager`는 주입 대상이 아니다. 전자는 `design.md`의 **생산자**이므로 낡은 사본을 주입받으면 안 되고(이 역할만 `design.md`를 직접 읽고 쓴다), 후자는 스택 의존성이 없다.
-   - 🔹 **요구사항 시나리오 SSOT — `inject-scenario.mjs` (Phase 1 선행 스텝 전용):** `business-analyst`가 확정한 Gherkin 시나리오(`.codex/_workspace/00_scenario/scenario.feature`)는 위와 **별도의 주입기**로 `system-architect`·`issue-pm`·`e2e-tester` 세 곳에만 정적 주입한다 (그 밖의 역할은 원래도 원본 요구사항을 보지 않으므로 대상이 아니다). `e2e-tester`는 Phase 4에서야 스폰되지만, Phase 1에서 커밋된 주입 블록이 그때까지 파일에 그대로 남아 있으므로 재주입이 필요 없다 — `<design_spec>`이 이미 그렇게 동작하는 것과 같은 방식이다.
+   - 🔹 **요구사항 시나리오 SSOT — `inject-scenario.mjs` (Gate 1 전용):** `business-analyst`가 확정한 Gherkin 시나리오(`.codex/_workspace/00_scenario/scenario.feature`)는 위와 **별도의 주입기**로 `system-architect`·`issue-pm`·`tech-leader`·`e2e-tester` 네 곳에만 정적 주입한다 (그 밖의 역할은 원래도 원본 요구사항을 보지 않으므로 대상이 아니다). `e2e-tester`는 Phase 4에서야 스폰되지만, Gate 1에서 생성된 주입 블록이 그때까지 파일에 그대로 남아 있으므로 재주입이 필요 없다 — `<design_spec>`이 이미 그렇게 동작하는 것과 같은 방식이다.
      ```bash
      node .codex/tools/inject-scenario.mjs
      ```
-     - ⚠️ **`design.md`와 결정적으로 다른 점: 시나리오 부재는 차단 사유가 아니다.** `scenario.feature`가 없으면 `[NOT READY]` 블록이 주입되고, 대상 에이전트는 사용자 요구사항 컨텍스트나 `requirements.md`로 폴백한다 — BA 단계를 거치지 않는 경로(기존 코드베이스에 소규모 변경을 더하는 경우 등)에서 정상적으로 발생하는 상태다.
-     - **재주입 시점:** Phase 1 진입 시 `business-analyst`가 `scenario.feature`를 확정(`[SCENARIO READY]`)한 직후, `system-architect` 위임 **전**.
+     - ⚠️ **`design.md`와 결정적으로 다른 점: 시나리오 부재는 차단 사유가 아니다.** `scenario.feature`가 없으면 `[NOT READY]` 블록이 주입되고, 대상 에이전트는 게이트 생략 경로에서만 정제된 spec.md/requirements.md로 폴백한다 — BA 단계를 거치지 않는 경로(기존 코드베이스에 소규모 변경을 더하는 경우 등)에서 정상적으로 발생하는 상태다.
+     - **재주입 시점:** Phase 0 Gate 1에서 `business-analyst`가 `scenario.feature`를 확정(`[SCENARIO READY]`)한 직후, `system-architect` 위임 **전**.
      - **최신성 검증:** `node .codex/tools/inject-scenario.mjs --check`. `SCENARIO_FINGERPRINT` 불일치·`none` 반환 시의 진단은 위 `DESIGN_FINGERPRINT`와 동일하게 처리한다 (세션 재시작 요청, 단 Node 부재로 인한 실행 불가는 예외).
 6. **페이즈 인계 계약 (Phase Handoff Contract)**
    - 오케스트레이터 컨텍스트는 길어지면 요약(auto-compact)되거나 세션 재시작으로 사라진다. 페이즈 경계에서 다음 페이즈가 필요한 사실을 **파일로 남겨** 컨텍스트를 잃어도 인계가 끊기지 않게 한다. 컨텍스트를 잘라내는 것이 아니라 **잃어도 무해한 구조**를 만드는 것이 목적이다.
@@ -89,6 +91,19 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 ---
 
 ## 🚀 Workflow (작업 순서)
+
+
+### Gate 1 — Phase 0: BA 요구사항 사용자 최종 확인
+- **시점:** 라우트·난이도 판별 직후, 설계·계약 이전. Phase 0의 스택 확보용 최소 아키텍트 호출보다도 먼저 수행한다.
+- **조건:** Heavy Track에서 요구사항이 불명확하면 필수. 현 요청과 일치하는 명확한 spec.md/requirements.md 또는 승인된 시나리오가 있으면 생략 가능하며 근거·파일 경로를 감사 로그에 남긴다. Fast·문서 단독·하네스 메타는 생략한다. Fast→Heavy 승격 시 다시 판별한다.
+- **BA 독립 세션 (P2P 문답):** 오케스트레이터는 BA 문답에 관여하지 않는다. 질문 중계·누적 Q&A 재스폰을 하지 않고, `business-analyst`를 서브 에이전트로 스폰하지도 않는다. 서브 에이전트는 오케스트레이터에게만 보고할 수 있어 사용자와 직접 문답할 수 없기 때문이다. Gate 1이 필요하면 오케스트레이터는 파이프라인을 **[WAITING_USER]로 멈추고** 사용자에게 아래를 안내한다.
+  - 새 Codex 세션에서 `refine_requirements`를 실행해 BA와 직접 문답한다. BA는 승인 전에는 `scenario.draft.feature`에만 쓰고, 사용자가 그 세션에서 완성본을 보고 "승인"이라고 답하면 `scenario.feature`를 쓴 뒤 세션을 종료한다. **`scenario.feature`는 사용자 승인 후에만 저장하며, 초안이 남아 있다면 두 파일 내용이 동일해야 현재 승인으로 인정한다.**
+  - 이 파이프라인 세션으로 돌아와 "BA 완료"라고 알린다. 대화 내용은 전달하지 않는다.
+  - 대안: 사용자가 원하면 이 세션에서 `refine_requirements` 스킬로 직접 문답할 수도 있다. 다만 문답이 이 세션 컨텍스트에 남으므로 Gate 1 통과 뒤 새 세션으로 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다.
+- **완성본 승인은 BA 세션의 사용자 응답이다.** "BA 완료"라는 말만으로는 승인으로 간주하지 않고 `scenario.feature`가 실제로 있는지 확인한다. 미응답·수정 요청·부분 산출물(`[WAITING USER]`)은 `scenario.feature`가 없거나 초안과 확정본의 내용이 다른 상태이며 설계·계약에 진입하지 않는다.
+- **오케스트레이터가 보는 것은 파일 상태뿐이다:** `.codex/_workspace/00_scenario/scenario.feature`가 존재하고, `scenario.draft.feature`가 있다면 두 파일의 내용이 정확히 동일하며(셸에서 바이트 내용을 비교하고 수정 시각은 사용하지 않는다), `node .codex/tools/inject-scenario.mjs --sections`가 exit 0일 때만 다음 단계로 진행한다. 초안과 확정본 내용이 다르면 승인되지 않은 수정이 남은 것이므로 BA 세션에서 재승인받는다. 오케스트레이터 자신이 `scenario.feature`를 쓰거나 승인하지 않는다.
+- **Pruning:** BA 세션을 종료하고 문답을 후속 컨텍스트에 포함하지 않는다. 오케스트레이터 컨텍스트에는 문답이 들어온 적이 없고, 보고·감사 로그·인계 파일에는 상태·경로·지문만 남긴다. 이후 에이전트에는 확정 파일만 정적 주입한다. 컨텍스트가 실제로 지워졌다고 주장하지 않는다.
+- 승인 확인 후 `node .codex/tools/inject-scenario.mjs`로 최종 산출물만 정적 주입한다. Phase 1을 건너뛰는 FE/BE 단독 Heavy 라우트도 동일하게 적용한다. 게이트를 생략한 경우만 기존 파일 부재 폴백이 허용된다.
 
 ### Phase 0: 컨텍스트 분석 및 동적 라우팅
 - 사용자 요청과 `.codex/_workspace/`의 기존 산출물을 분석하여 필요한 페이즈만 선택한다.
@@ -161,7 +176,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 
   - ⛔ **`exit 1`과 그 밖의 실패를 같은 것으로 취급하지 마라.** 전자는 하네스가 의도한 판정이고, 후자는 하네스를 실행할 수 없다는 뜻이다.
   - ⛔ 런타임 부재를 `design.md` 문제로 오진하지 마라. `DESIGN_FINGERPRINT` 불일치·`none`을 Rule 5의 "세션 재시작" 진단으로 처리하는 것도 이 경우에는 오답이다 — 세션을 몇 번 재시작해도 Node는 생기지 않는다.
-- ⭐️ **설계 명세 주입 (하네스 메타 라우트를 제외한 전 라우트에서 최우선 실행):** 어떤 에이전트를 스폰하기 전에 반드시 먼저 실행한다.
+- ⭐️ **설계 명세 주입 (하네스 메타 라우트를 제외한 전 라우트에서 최우선 실행):** 스택 의존 에이전트를 스폰하기 전에 실행한다. Gate 1의 BA는 스택 확정 이전에 동작하며 주입을 기다리지 않는다.
   ```bash
   node .codex/tools/inject-design.mjs
   ```
@@ -177,15 +192,11 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 - `orchestrator-log.jsonl`에 `INIT` 로그와 선택한 라우트명, 선택·생략한 페이즈, 근거, 그리고 `design_fingerprint`를 기록한다.
 
 ### Phase 1: 아키텍처 설계
-- ⭐️ **선행 스텝 — 요구사항 정제 (`business-analyst`, 조건부):** `system-architect`를 위임하기 **전에**, `.codex/_workspace/00_scenario/scenario.feature`가 아직 없거나 사용자 요청이 충분히 구체적이지 않다고 판단되면 `business-analyst` agent type을 서브 에이전트로 위임한다. 이미 스택 확정 목적의 **최소 범위 호출**(Phase 0의 "없거나 불완전한 경우" 경로)뿐이거나, 사용자 요청 자체가 이미 충분히 구체적이면 이 스텝을 생략하고 곧바로 `system-architect`를 위임한다.
-  - **라운드 루프:** 사용자 원 요청을 프롬프트에 실어 위임한다. 응답 첫 줄이 `[NEEDS INPUT]`이면 뒤따르는 질문 목록을 사용자에게 그대로 전달하고, 답변을 받으면 "원 요청 + 지금까지의 질문·답변 누적"을 다시 프롬프트에 실어 **동일 역할을 재위임**한다. `[SCENARIO READY]`가 나올 때까지 반복한다.
-  - ⛔ **BA는 사용자와 직접 대화하지 않는다.** Codex의 서브 에이전트는 오케스트레이터에게만 보고하는 허브-스포크 구조이므로, 질문 중계와 답변 수집은 오케스트레이터의 책임이다.
-  - 완료 즉시(또는 스텝을 생략했다면 그대로) `node .codex/tools/inject-scenario.mjs`를 실행하고 `--sections`로 최소 Gherkin 구조(Feature·Scenario·Given/When/Then)를 확인한다. `scenario.feature`가 없어도 `--sections`는 실패(exit 1)로 취급하지 않는다 — 이 페이즈를 막는 게이트는 **아니며**, `system-architect`·`issue-pm`은 `[NOT READY]` 블록을 받고 기존처럼 사용자 요구사항/`requirements.md`로 폴백한다.
-  - BA가 쓴 대화 히스토리(질문·답변 왕복)는 이 스텝이 끝나면 다음 페이즈로 넘기지 않는다. 남는 것은 `scenario.feature` 파일 하나뿐이다.
+- Gate 1은 Phase 0에서 완료한다. 여기서 BA를 다시 호출하거나 대화 루프를 재개하지 않는다. Gate 1 수행 경로에서는 승인·Gherkin 검사 통과 후에만 아키텍트를 호출한다.
 - 전체 구축이거나 아키텍처 변경이 필요한 경우에만 `system-architect` agent type을 **서브 에이전트로 스폰**해 `design.md`를 산출한다. 단독 산출물 생산자이므로 위임은 이 한 번으로 끝나며 별도의 종료 시퀀스가 필요 없다.
 - ⭐️ **산출물 검수 (스크립트 위임):** `node .codex/tools/inject-design.mjs --sections`를 실행해 **기술 스택·디렉터리 구조 및 소유권·표준 명령어·계약 산출 형식·아키텍처 규약** 5개 섹션이 모두 채워졌는지 확인한다. exit 1이면 다음 페이즈로 진행하지 않고, 스크립트가 지목한 미충족 섹션만 아키텍트에게 보완 지시한다. 여기서도 `design.md` 전문을 열지 않는다.
 - ⭐️ **[필수] 재주입:** 검수 통과 즉시 `node .codex/tools/inject-design.mjs`를 다시 실행하여 확정된 설계를 하위 에이전트의 시스템 프롬프트에 반영하고, 새 `fingerprint`를 기준 지문으로 갱신한다. **이 단계를 건너뛰면 Phase 2 이후 전원이 낡거나 비어 있는 명세로 작업하게 된다.**
-- ⭐️ **[마이크로 커밋]** 완료 후 `git commit -m "docs(architecture): 시스템 설계 완료"` 실행. 주입으로 변경된 `.codex/agents/*.toml`과, BA 선행 스텝을 수행했다면 `scenario.feature`도 같은 커밋에 포함한다. **이 지시는 Phase 1을 수행하는 라우트에만 적용된다** — 하네스 메타 라우트는 Phase 1도, 주입도 실행하지 않는다. 커밋 직전에 Rule 6의 인계 파일 `handoff/phase-1.md`를 기록한다.
+- ⭐️ **[마이크로 커밋]** 완료 후 `git commit -m "docs(architecture): 시스템 설계 완료"` 실행. 주입으로 변경된 `.codex/agents/*.toml`과, Gate 1을 수행했다면 `scenario.feature`도 같은 커밋에 포함한다. **이 지시는 Phase 1을 수행하는 라우트에만 적용된다** — 하네스 메타 라우트는 Phase 1도, 주입도 실행하지 않는다. 커밋 직전에 Rule 6의 인계 파일 `handoff/phase-1.md`를 기록한다.
 
 ### Phase 2: 티켓팅 및 브랜치 파생 (Sub-agent)
 - 필요한 역할만 서브 에이전트로 위임한다. 신규 티켓이 필요하면 `issue-pm` agent type, 계약이 필요하면 `tech-leader` agent type을 명시한다.
@@ -225,7 +236,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 - **Heavy 트랙 전용이다.** Fast 트랙은 이 페이즈를 생략하고 Phase 3에서 곧바로 Phase 5로 넘어간다.
 - **진입 조건:** Track A의 모든 레인(FE·BE·데이터)이 완료돼야 한다. 한 레인이라도 남아 있으면 시작하지 않는다.
 - `e2e-tester`를 서브 에이전트로 위임한다.
-- `e2e-tester`는 Phase 1에서 이미 주입된 `<scenario_spec>`(BA가 확정한 Gherkin, READY인 경우)을 시나리오의 1차 근거로 삼으므로, 오케스트레이터가 스폰 프롬프트에 시나리오를 따로 요약해 넣을 필요가 없다.
+- `e2e-tester`는 Gate 1에서 이미 주입된 `<scenario_spec>`(BA가 확정한 Gherkin, READY인 경우)을 시나리오의 1차 근거로 삼으므로, 오케스트레이터가 스폰 프롬프트에 시나리오를 따로 요약해 넣을 필요가 없다.
 - 주입된 `<design_spec>`이 확정한 E2E 도구로 작성된 테스트가 100% 통과(Green)되는지 대기한다.
 - ⭐️ **실패 시 핀포인트 재스폰 (Error Log Triage):** `e2e-tester`는 실패를 `area`·`failing`·`evidence`·`repro`·`scope`의 **구조화 판정**으로 반환한다 (형식은 `e2e-tester` 정의의 §3). 오케스트레이터는 `area`만 보고 재스폰 대상을 정한다.
 

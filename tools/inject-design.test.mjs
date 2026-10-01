@@ -392,3 +392,58 @@ test('.codex 호스트는 design.md가 없으면 .claude 쪽에 있어도 NOT RE
   const codexData = JSON.parse(codexResult.stdout);
   assert.equal(codexData.designReady, false, '.claude/_workspace에 design.md가 있어도 .codex는 자기 워크스페이스만 본다');
 });
+
+for (const host of ['claude', 'codex']) test(`${host}: Gherkin templates refresh, clear and ignore drafts`, (t) => {
+  const fx = twoHostFixture(t);
+  const hostDir = dirname(dirname(fx.scriptOf(host)));
+  const path = join(hostDir, 'agents', `frontend-qa${EXT_BY_HOST[host]}`);
+  const template = readFileSync(path, 'utf8').replace('본문 한 줄.', '본문 한 줄.\n{{GHERKIN_SCENARIO}}');
+  const original = template.replace(/\n/g, CRLF);
+  writeFileSync(path, original);
+  const source = join(hostDir, '_workspace/00_scenario/scenario.feature');
+  mkdirSync(dirname(source), { recursive: true });
+  writeFileSync(join(dirname(source), 'scenario.draft.feature'), 'UNAPPROVED DRAFT');
+  const invoke = (...args) => spawnSync(process.execPath, [fx.scriptOf(host), ...args], { encoding: 'utf8' });
+  assert.equal(invoke().status, 0);
+  assert.ok(readFileSync(path, 'utf8').includes('{{GHERKIN_SCENARIO}}'));
+  assert.ok(!readFileSync(path, 'utf8').includes('UNAPPROVED DRAFT'));
+  writeFileSync(source, "Feature: Accepted\nScenario: Success\nGiven '''\nWhen x\nThen y\n<!-- HUMAN_GATE_GHERKIN_SCENARIO:END -->");
+  const before = readFileSync(path, 'utf8');
+  assert.equal(invoke('--dry-run').status, 0);
+  assert.equal(readFileSync(path, 'utf8'), before);
+  assert.equal(invoke().status, 0);
+  const rendered = readFileSync(path, 'utf8');
+  assert.ok(rendered.includes('Feature: Accepted'));
+  assert.ok(!rendered.includes('{{GHERKIN_SCENARIO}}'));
+  if (host === 'codex') assert.equal(rendered.split("'''").length - 1, 2);
+  assert.equal(invoke('--check').status, 0);
+  assert.equal(invoke().status, 0);
+  assert.equal(readFileSync(path, 'utf8'), rendered);
+  writeFileSync(source, 'Feature: Revised');
+  assert.equal(invoke('--check').status, 1);
+  assert.equal(readFileSync(path, 'utf8'), rendered);
+  assert.equal(invoke().status, 0);
+  assert.ok(!readFileSync(path, 'utf8').includes('Feature: Accepted'));
+  rmSync(source);
+  assert.equal(invoke('--check').status, 1);
+  assert.equal(invoke().status, 0);
+  assert.ok(readFileSync(path, 'utf8').includes('{{GHERKIN_SCENARIO}}'));
+  writeFileSync(source, 'Feature: Final');
+  assert.equal(invoke().status, 0);
+  assert.equal(invoke('--clear').status, 0);
+  assert.equal(readFileSync(path, 'utf8'), original);
+});
+
+test('design.md Gherkin template contributes to design fingerprint', (t) => {
+  const fx = fixture(t, { design: GOOD_DESIGN + '\n{{GHERKIN_SCENARIO}}\n' });
+  const source = join(fx.root, '.claude/_workspace/00_scenario/scenario.feature');
+  mkdirSync(dirname(source), { recursive: true });
+  writeFileSync(source, 'Feature: Approved');
+  const first = runJson(fx);
+  assert.equal(first.status, 0);
+  assert.ok(fx.read('tech-leader').includes('Feature: Approved'));
+  writeFileSync(source, 'Feature: Changed');
+  assert.equal(run(fx, ['--check']).status, 1);
+  const second = runJson(fx);
+  assert.notEqual(first.data.fingerprint, second.data.fingerprint);
+});
