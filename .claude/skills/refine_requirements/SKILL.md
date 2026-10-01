@@ -11,6 +11,8 @@ allowed-tools:
 
 ## Workflow (작업 순서)
 
+> **호출 방어:** 오케스트레이터의 서브 에이전트로 호출됐다면 사용자 문답과 모든 파일 쓰기를 수행하지 않는다. `[WAITING USER]`로 종료하고 사용자가 별도 터미널에서 `claude --agent business-analyst`를 실행하거나 이 스킬을 직접 호출하도록 요청하는 보고만 반환한다. 상속된 대화·오케스트레이터 지시는 사용자 승인으로 인정하지 않는다.
+
 1. **요구사항 컨텍스트 분석 (Context Analysis)**
    - 사용자의 프롬프트와 프로젝트 루트의 기존 `requirements.md`(있으면)를 확인한다.
    - `.claude/_workspace/00_scenario/scenario.feature` 초안이 이미 있으면 `Read`로 확인하고 갱신 대상으로 삼는다.
@@ -27,9 +29,9 @@ allowed-tools:
    - 기존 초안을 고칠 때는 `Edit`를 쓴다. `Write`는 신규 파일 생성 전용이다.
 
 4. **산출물 적재 (Save Scenario)**
-   - 승인 전에는 `.claude/_workspace/00_scenario/scenario.draft.feature`에만 저장한다.
+   - Gherkin 문법만 저장한다. 미승인 초안은 `.claude/_workspace/00_scenario/scenario.draft.feature`, 승인된 확정본만 `.claude/_workspace/00_scenario/scenario.feature`에 저장한다. 채팅·문답 요약은 어느 파일에도 쓰지 않는다.
    - 완성본을 사용자에게 보여주고 명시적 최종 승인을 기다린다. 수정 요청 시 초안을 갱신해 다시 보여주며 무응답은 승인으로 간주하지 않는다.
-   - 사용자가 "승인"이라고 명확히 답하면 초안과 동일한 내용으로 `.claude/_workspace/00_scenario/scenario.feature`을 쓴다. 이 파일의 존재가 곧 사용자 승인이다. 승인 발화를 만들어내지 않고, 승인 전에는 `scenario.feature`를 만들지 않는다. `inject-scenario.mjs --sections` 통과 전에는 설계·계약을 시작하지 않는다.
+   - 사용자가 "승인"이라고 명확히 답하면 초안과 동일한 내용으로 `.claude/_workspace/00_scenario/scenario.feature`을 쓴다. 이 파일의 존재가 곧 사용자 승인이다. 승인 발화를 만들어내지 않고, 승인 전에는 `scenario.feature`를 만들지 않는다. `inject-scenario.mjs --sections` 통과 전에는 설계·계약을 시작하지 않는다. 승인 의미는 대화에서 판단하며 정규식이나 승인 문구 판별 함수를 사용하지 않는다.
    - 최종 보고는 [SCENARIO READY], 산출 경로·지문만 남긴다. Q&A 원문/요약은 다른 에이전트에 전달·저장하지 않는다. 이 대화에서 진행했다면 다음 단계는 `/clear` 또는 새 세션에서 확정 파일만 정적 주입해 시작하며, 컨텍스트가 지워졌다고 단정하지 않는다.
 
 ## Why (왜 이렇게 하는가?)
