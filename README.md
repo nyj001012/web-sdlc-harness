@@ -76,37 +76,27 @@ cp -r /tmp/harness/.agents/skills <대상>/.agents/             # Codex 스킬 (
 
 ### Gate 1·2: 사용자와 확정하는 두 단계
 
-| 단계 | 수행 시점과 조건 | 사용자와 확정하는 것 | 다음 단계의 확인 조건 |
-|---|---|---|---|
-| **Gate 1 — BA 요구사항 확인** | Phase 0, 아키텍처·계약 이전. Heavy에서 요구사항이 불명확하면 필수 | Gherkin 초안 전문을 검토하고 완성본 승인 | `scenario.feature` 존재, 남아 있는 `scenario.draft.feature`와 바이트 일치, Gherkin 구조 검사 통과 |
-| **Gate 2 — QA 테스트 명세 확인** | 계약 확정 직후, 테스트 코드·개발·DB 구현 이전. TDD QA가 필요한 Heavy 라우트에서 필수 | 필수 테스트 상황 입력 → 경계·예외 케이스 일괄 제안 → 포함/제외 선택 → 완성본 전문 승인 | `human-gate.mjs tests --check` 통과, 명세 재주입 및 작성 전 지문 대조 |
+| 단계 | 수행 시점 | 사용자 승인 대상 |
+|---|---|---|
+| **Gate 1 — 요구사항** | Phase 0, 설계·계약 이전 | BA와 정제한 Gherkin 완성본(`scenario.feature`) |
+| **Gate 2 — 테스트 명세** | 계약 확정 후, 테스트·개발·DB 구현 이전 | QA와 필수·경계·예외 케이스를 선택한 완성본(`test-cases.md`) |
 
-Gate 1은 현재 요청과 일치하는 명확한 spec.md/requirements.md 또는 승인된 시나리오가 있으면 근거를 기록하고 생략할 수 있다. Fast·문서 단독·하네스 메타에서도 생략하며, Fast가 Heavy로 승격되면 다시 판별한다. Gate 2는 Fast에서 QA와 함께 생략한다. TDD QA가 없는 인프라 단독·문서 단독·하네스 메타는 생략 사유를 기록한다. Phase 2를 건너뛰는 FE/BE Heavy 라우트도 Gate 2를 Phase 3의 첫 단계에서 수행한다.
+Heavy에서 요구사항이 불명확하면 Gate 1, TDD QA가 필요하면 Gate 2를 수행한다. Gate 1은 현재 요청에 맞는 명확한 요구사항이나 승인된 시나리오가 있으면 근거를 기록하고 생략한다. Fast·문서·하네스 메타는 두 게이트를 생략하며, 인프라 단독은 Gate 2를 생략한다. FE/BE 단독 Heavy는 Gate 2를 Phase 3 시작 시 수행한다.
 
-BA와 CASE_REVIEW QA는 사용자와 직접 문답하는 **독립 세션**에서 실행한다. 오케스트레이터는 질문을 중계하거나 CASE_REVIEW를 서브 에이전트로 스폰하지 않고 `[WAITING_USER]`로 멈춘다. 실행 방법은 호스트별로 다르다.
+BA와 QA 명세 검토(**CASE_REVIEW**)는 아래 **독립 세션**에서 진행한다. 그동안 오케스트레이터는 `[WAITING_USER]`로 기다린다.
 
 | 호스트 | Gate 1 | Gate 2 |
 |---|---|---|
 | Claude Code | 별도 터미널에서 `claude --agent business-analyst` 실행 | 별도 터미널에서 `claude --agent backend-qa` 또는 `frontend-qa` 실행; CASE_REVIEW로 명세 검토 |
 | Codex | 새 Codex 세션에서 `refine_requirements` 스킬 직접 실행 | 새 Codex 세션에서 `design_backend_tdd_cases` 또는 `design_frontend_tdd_cases` 스킬을 CASE_REVIEW 모드로 직접 실행 |
 
-Codex의 스킬 직접 실행은 QA TOML의 지침을 자동으로 주입받는 경로가 아니다. 오케스트레이터가 QA 안내 전에 `inject-design.mjs`로 입력을 준비하면, 독립 QA 세션은 스킬 절차에 따라 해당 QA 정의 파일의 설계·시나리오 관리 블록을 한 번 읽고 지문을 확인한다. 원본 `design.md`는 다시 읽지 않는다. Claude Code에서 스킬로 직접 문답하는 대안도 같은 입력 로딩 절차를 따른다.
+Codex 스킬 직접 실행은 QA TOML을 자동 주입받지 않는다. 오케스트레이터가 입력을 준비하고, 독립 QA가 스킬 절차에 따라 QA 정의의 관리 블록을 한 번 읽어 지문을 확인한다. 원본 `design.md`는 읽지 않는다.
 
-Gate 2는 **하나의 QA 세션이 FE/BE 전체의 명세를 맡는다.** 승인 전에는 `test-cases.draft.md`만 작성하고, 사용자가 완성본을 승인한 뒤 동일한 내용의 `test-cases.md`와 승인 영수증을 남긴다. 추가 케이스의 번호별 선택은 완성본 승인과 별개다. 사용자 승인 의미는 QA가 대화에서 판단하며, 지문 도구는 승인 발화를 해석하지 않는다.
+Gate 2는 하나의 QA 세션이 FE/BE 전체를 맡는다. **케이스 선택 뒤 완성본을 별도로 승인**해야 한다. 승인 전에는 초안만 작성하며, 승인 후 확정본과 영수증을 남긴다.
 
-BA/QA 세션이 끝나면 원래 오케스트레이터 세션으로 돌아와 완료를 알린다. 오케스트레이터는 "BA 완료"·"QA 완료"라는 말만으로 진행하지 않고 파일 상태와 승인 검사를 확인한다. 후속 QA는 **WRITE_TESTS** 모드로 승인된 ID의 Red 테스트를 작성하고, 그 다음 개발·리뷰가 이어진다. QA 대화 원문이나 요약은 후속 역할에 전달하지 않고 확정 파일·경로·지문만 인계한다.
+완료 후 원래 세션으로 돌아와 알리면, 오케스트레이터가 파일 상태와 승인을 검사한다. 이후 QA의 **WRITE_TESTS** → 구현 → 리뷰 순으로 진행하며, 후속 역할에는 대화 대신 확정 파일을 인계한다.
 
-Codex 호스트에서 승인 확인·재주입에 쓰는 명령은 다음과 같다. Claude Code에서는 경로의 `.codex`를 `.claude`로 바꾼다.
-
-```bash
-node .codex/tools/inject-scenario.mjs --sections  # Gate 1 수행 경로: 확정본·초안 비교 후 Gherkin 검사
-node .codex/tools/inject-scenario.mjs             # Gate 1 확인 후 시나리오 주입
-node .codex/tools/human-gate.mjs tests --check  # 승인 영수증과 현재 파일 대조
-node .codex/tools/inject-design.mjs            # 승인 확인 후 설계·시나리오·테스트 명세 재주입
-node .codex/tools/inject-design.mjs --check --json
-```
-
-`tests --record`는 사용자가 승인한 뒤 QA 세션만 실행한다. 요구사항·시나리오·설계·계약·테스트 명세가 바뀌면 기존 영수증은 유효하지 않아 재승인이 필요하다. 초안이 남아 있고 확정본과 바이트가 다르면 `--check`와 `--record`가 모두 실패한다. QA·개발자·DB 역할은 첫 코드 쓰기 전에 승인 검사와 현재 프롬프트의 설계·테스트 명세 지문 대조를 통과해야 한다. 디스크가 최신이어도 현재 세션의 지문이 다르면 새 세션에서 재개한다.
+요구사항·설계·계약·테스트 명세 변경 시 Gate 2 재승인이 필요하다. 세션의 지문이 최신 입력과 다르면 새 세션에서 재개한다. 세부 검사·재주입 절차는 [Codex 오케스트레이터](.agents/skills/run_web_sdlc/SKILL.md)와 [Claude 오케스트레이터](.claude/skills/run_web_sdlc/SKILL.md)를 따른다.
 
 ## 핵심 원리: 기술 스택을 전제하지 않는다
 
@@ -169,7 +159,7 @@ node .claude/tools/inject-design.mjs --clear    # 주입 블록 제거, 하네�
 
 `inject-scenario.mjs`는 BA가 승인받은 `scenario.feature`를 `system-architect`·`issue-pm`·`tech-leader`·`e2e-tester` 네 곳에 정적 주입한다. 시나리오가 없을 때 spec.md/requirements.md로 폴백하는 것은 **Gate 1을 생략한 경로에서만** 허용된다. Gate 1 수행 경로에서는 확정본과 구조 검사를 확인하기 전까지 설계·계약에 진입하지 않는다. `e2e-tester`는 이 시나리오를 사용자 흐름 검증의 1차 근거로 사용한다.
 
-`inject-design.mjs`는 설계 또는 대상 에이전트 본문의 `{{GHERKIN_SCENARIO}}`와 `{{TEST_CASES}}`도 확정 파일로 채운다. QA는 시나리오와 테스트 명세를, 개발자·DB는 테스트 명세를 받는다. 초안은 주입하지 않는다. 주입·갱신·삭제 감지와 `--clear` 복원은 관리 블록으로 추적하며, `--json`의 `humanGateInputs`에서 입력별 준비 상태와 지문을 확인한다.
+`inject-design.mjs`는 QA에 확정 시나리오·테스트 명세를, 개발자·DB에 테스트 명세를 주입한다. 초안은 주입하지 않는다.
 
 ## 🚀 에이전트 오케스트레이션 파이프라인 (Pipeline Architecture)
 
@@ -305,7 +295,7 @@ graph TD
 
 ### 명세와 강제의 구분
 
-위 팬인 구조와 Phase 4 진입 조건은 오케스트레이터가 지키는 규칙이다. Gate 2에는 별도의 지문 검사가 있으며, `human-gate.mjs`가 영수증 누락·입력 변경·초안과 확정본 불일치를 exit 1로 검출한다. 이 도구는 사용자의 승인 의사를 판단하지 않는다. 승인 뒤 영수증을 기록하는 책임과 검사 실패 시 후속 역할을 시작하지 않는 책임은 각각 QA와 오케스트레이터에 있다. 주입기 검사·배포 오염 검사·SSOT 재열람 훅의 역할과도 구분한다.
+팬인과 Phase 4 진입 조건은 오케스트레이터가 지킨다. Gate 2의 `human-gate.mjs tests --check`는 영수증 누락·입력 변경·초안 불일치를 검출한다. 사용자 승인 판단과 영수증 기록은 QA, 검사 실패 시 진행 중단은 오케스트레이터의 책임이다.
 
 `design.md`·`scenario.feature`는 하네스가 소비 대상 에이전트의 시스템 프롬프트에 이미 전문을 정적 주입하지만(「설계 명세는 읽지 않고 주입한다」 참고), 에이전트 정의 안의 "도구로 다시 읽지 마라"는 규약은 프롬프트 텍스트일 뿐 강제력이 없었다. `PreToolUse`/`SessionStart` 훅(`.claude/tools/web-sdlc-harness-guard-ssot-read.mjs`·`web-sdlc-harness-check-injection-drift.mjs`, `.codex/`에도 동일 포트)이 이 재열람 시도를 실제로 차단하고, 주입 드리프트를 세션 시작마다 경고한다.
 
@@ -410,7 +400,7 @@ tools/                             # 어느 호스트에도 속하지 않는 유
 
 `--claude` 단독 설치에서는 `.codex/` 디렉터리가, `--codex` 단독 설치에서는 `.claude/` 디렉터리가 아예 생기지 않는다. 두 호스트를 함께 설치하면 `.claude/_workspace/`와 `.codex/_workspace/`가 각각 따로 생긴다 — `design.md`도 호스트마다 독립이므로, 한 프로젝트에서 Claude로 설계하고 Codex로 이어받는 흐름은 지원하지 않는다. 호스트를 바꿔 같은 설계를 이어 쓰려면 그 호스트에서 Phase 1을 다시 돌리거나 `_workspace/`를 수동으로 복사해야 한다.
 
-미추적 네 경로는 설치기가 `.gitignore`에 추가한다. 스테이징하거나 커밋하지 않는다. 새 세션에서 재개할 때 Gate 2 영수증이 없거나 입력이 바뀌었다면 QA 독립 세션에서 다시 승인받는다. `scenario.draft.feature`와 `test-cases.draft.md`는 자동 무시 경로가 아니지만, 승인된 합의물과 구분해 관리하며 주입 입력으로 사용하지 않는다.
+미추적 네 경로는 설치기가 `.gitignore`에 추가한다. 스테이징하거나 커밋하지 않는다. 승인 전 초안은 자동 무시되지 않으므로 확정본과 구분해 관리한다.
 
 - **페이즈 인계 파일(`handoff/`)** — 오케스트레이터 컨텍스트가 요약되거나 세션이 끊겨도 인계가 끊기지 않게, 페이즈 경계에서 다음 페이즈가 필요한 사실만 40줄 이내로 남긴다. 설계서·계약·소스의 본문을 옮겨 담지 않고 경로만 적는다. 재개 시에는 **가장 높은 번호 하나만** 읽는다.
 
