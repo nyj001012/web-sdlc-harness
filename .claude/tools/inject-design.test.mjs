@@ -393,19 +393,20 @@ test('.codex 호스트는 design.md가 없으면 .claude 쪽에 있어도 NOT RE
   assert.equal(codexData.designReady, false, '.claude/_workspace에 design.md가 있어도 .codex는 자기 워크스페이스만 본다');
 });
 
-for (const host of ['claude', 'codex']) test(`${host}: Gherkin templates refresh, clear and ignore drafts`, (t) => {
+for (const host of ['claude', 'codex']) for (const token of ['GHERKIN_SCENARIO', 'TEST_CASES']) test(`${host}/${token}: templates refresh, clear and ignore drafts`, (t) => {
   const fx = twoHostFixture(t);
   const hostDir = dirname(dirname(fx.scriptOf(host)));
   const path = join(hostDir, 'agents', `frontend-qa${EXT_BY_HOST[host]}`);
-  const template = readFileSync(path, 'utf8').replace('본문 한 줄.', '본문 한 줄.\n{{GHERKIN_SCENARIO}}');
+  const slot = `{{${token}}}`;
+  const template = readFileSync(path, 'utf8').replace('본문 한 줄.', `본문 한 줄.\n${slot}`);
   const original = template.replace(/\n/g, CRLF);
   writeFileSync(path, original);
-  const source = join(hostDir, '_workspace/00_scenario/scenario.feature');
+  const source = join(hostDir, token === 'GHERKIN_SCENARIO' ? '_workspace/00_scenario/scenario.feature' : '_workspace/04_test_cases/test-cases.md');
   mkdirSync(dirname(source), { recursive: true });
-  writeFileSync(join(dirname(source), 'scenario.draft.feature'), 'UNAPPROVED DRAFT');
+  writeFileSync(join(dirname(source), token === 'GHERKIN_SCENARIO' ? 'scenario.draft.feature' : 'test-cases.draft.md'), 'UNAPPROVED DRAFT');
   const invoke = (...args) => spawnSync(process.execPath, [fx.scriptOf(host), ...args], { encoding: 'utf8' });
   assert.equal(invoke().status, 0);
-  assert.ok(readFileSync(path, 'utf8').includes('{{GHERKIN_SCENARIO}}'));
+  assert.ok(readFileSync(path, 'utf8').includes(slot));
   assert.ok(!readFileSync(path, 'utf8').includes('UNAPPROVED DRAFT'));
   writeFileSync(source, "Feature: Accepted\nScenario: Success\nGiven '''\nWhen x\nThen y\n<!-- HUMAN_GATE_GHERKIN_SCENARIO:END -->");
   const before = readFileSync(path, 'utf8');
@@ -414,7 +415,7 @@ for (const host of ['claude', 'codex']) test(`${host}: Gherkin templates refresh
   assert.equal(invoke().status, 0);
   const rendered = readFileSync(path, 'utf8');
   assert.ok(rendered.includes('Feature: Accepted'));
-  assert.ok(!rendered.includes('{{GHERKIN_SCENARIO}}'));
+  assert.ok(!rendered.includes(slot));
   if (host === 'codex') assert.equal(rendered.split("'''").length - 1, 2);
   assert.equal(invoke('--check').status, 0);
   assert.equal(invoke().status, 0);
@@ -427,7 +428,7 @@ for (const host of ['claude', 'codex']) test(`${host}: Gherkin templates refresh
   rmSync(source);
   assert.equal(invoke('--check').status, 1);
   assert.equal(invoke().status, 0);
-  assert.ok(readFileSync(path, 'utf8').includes('{{GHERKIN_SCENARIO}}'));
+  assert.ok(readFileSync(path, 'utf8').includes(slot));
   writeFileSync(source, 'Feature: Final');
   assert.equal(invoke().status, 0);
   assert.equal(invoke('--clear').status, 0);
@@ -446,4 +447,25 @@ test('design.md Gherkin template contributes to design fingerprint', (t) => {
   assert.equal(run(fx, ['--check']).status, 1);
   const second = runJson(fx);
   assert.notEqual(first.data.fingerprint, second.data.fingerprint);
+});
+
+test('both placeholders in design.md use final artifacts and detect test-case changes', (t) => {
+  const fx = fixture(t, { design: GOOD_DESIGN + '\n{{GHERKIN_SCENARIO}}\n{{TEST_CASES}}\n' });
+  const scenario = join(fx.root, '.claude/_workspace/00_scenario/scenario.feature');
+  const cases = join(fx.root, '.claude/_workspace/04_test_cases/test-cases.md');
+  mkdirSync(dirname(scenario), { recursive: true });
+  mkdirSync(dirname(cases), { recursive: true });
+  writeFileSync(scenario, 'Feature: Final scenario');
+  writeFileSync(cases, '# Final test cases\nTC-01: accepted');
+  const first = runJson(fx);
+  assert.equal(first.status, 0);
+  assert.ok(fx.read('backend-developer').includes('Final scenario'));
+  assert.ok(fx.read('backend-developer').includes('TC-01: accepted'));
+  assert.equal(runJson(fx, ['--sections']).data.fingerprint, first.data.fingerprint);
+  writeFileSync(cases, '# Revised test cases');
+  assert.equal(run(fx, ['--check']).status, 1);
+  assert.notEqual(runJson(fx).data.fingerprint, first.data.fingerprint);
+  writeFileSync(cases, '');
+  assert.equal(run(fx).status, 0);
+  assert.ok(fx.read('backend-developer').includes('{{TEST_CASES}}'));
 });

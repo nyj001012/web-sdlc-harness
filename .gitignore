@@ -18,3 +18,7 @@
 # 스택별 무시 규칙(빌드 산출물, 의존성 디렉터리 등)은 이 파일에 넣지 않는다.
 # 이 하네스는 기술 스택 무관이며, 그것은 design.md가 스택을 확정한 뒤
 # devops-engineer가 다룰 몫이다.
+
+# 사용자 승인 지문 — 대화 기록 없이 보관하는 런타임 상태
+.claude/_workspace/human-gates/
+.codex/_workspace/human-gates/
