@@ -221,9 +221,12 @@ allowed-tools:
 - **QA 독립 세션 (P2P 문답):** 오케스트레이터는 QA 문답에 관여하지 않는다. 질문 중계·재스폰을 하지 않고 CASE_REVIEW용 QA를 서브 에이전트로 스폰하지도 않는다(서브 에이전트는 사용자와 직접 문답할 수 없다). Gate 2가 필요하면 파이프라인을 **[WAITING_USER]로 멈추고** 사용자에게 안내한다: 별도 터미널에서 `claude --agent backend-qa`(또는 `frontend-qa`)를 실행해 QA와 직접 문답하고, QA가 test-cases.md를 작성해 사용자의 승인을 받은 뒤 세션이 종료되면, 이 세션으로 돌아와 "QA 완료"라고 알린다. 하나의 QA 세션이 FE/BE 레인 전체를 맡으며 이 시점에는 테스트/개발/DB 구현 역할을 시작하지 않는다.
 - 대안: 사용자가 원하면 이 세션에서 `design_backend_tdd_cases`/`design_frontend_tdd_cases`를 CASE_REVIEW로 직접 실행할 수 있다. 다만 문답이 이 세션 컨텍스트에 남으므로 Gate 2 통과 뒤 `/clear`(또는 새 세션)로 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다.
 - QA 세션은 사용자 필수 테스트 상황을 먼저 입력받은 뒤 요구사항·계약에서 경계 조건/예외를 추출한다. 제안은 ID·상황·기대 결과·이유를 담은 리스트로 **반드시 배치 질의**한다. 번호별 승인/제외/수정을 받고 한 건씩 질문하는 루프는 금지한다.
+- **미확정 초안 차단:** `test-cases.draft.md`가 존재하면 `test-cases.md`와 바이트 내용이 동일해야 `tests --record`와 `tests --check`가 통과한다. 수정 시각은 판단 근거가 아니다. 내용이 다르거나 초안이 비어 있으면 기존 영수증이 있어도 `[WAITING USER]`로 중단한다. 초안 부재는 기존 확정본의 승인 검사를 유지한다. 차단을 우회하려고 초안을 삭제하거나 덮어쓰지 않는다. 재승인 시 사용자에게 보여준 초안과 동일한 확정본을 저장하고 새 영수증을 기록한 뒤 검사한다.
 - **승인은 QA 세션의 사용자 응답이다.** 파일 존재·"QA 완료"라는 말·시간 경과는 승인이 아니다. QA 세션은 사용자가 명시적으로 승인한 뒤에만 `node .claude/tools/human-gate.mjs tests --record`로 영수증을 남긴다. 오케스트레이터는 이 명령을 실행하지 않고 `node .claude/tools/human-gate.mjs tests --check`의 exit 0일 때만 Phase 3 코드를 작성하는 역할을 호출한다. `--check`는 명세 지문과 요구사항·시나리오·설계·계약 지문을 영수증과 대조하며, 내용 변경·추가·삭제 시 게이트가 다시 열려 QA 세션에서 재승인한다.
 - **파일 인계:** QA 대화를 종료하고 WRITE_TESTS 모드의 QA와 개발자에게 확정 파일 경로·승인 지문만 전달한다. 대화/요약을 전달하지 않는다. 메인 대화에서 직접 문답했다면 `/clear`나 새 세션에서 `handoff/` 파일과 확정 파일만으로 재개하며, 컨텍스트가 지워졌다고 단정하지 않는다. QA/개발자는 확정 파일을 읽고 ID를 기준으로 작업하며 채팅 내역을 근거로 삼지 않는다.
 - **기존 TDD 순서 유지:** 명세 승인 → QA의 Red 테스트 → 개발 구현 → 리뷰. DB 구현도 명세 승인 이후 시작한다. Full의 인프라 트랙도 게이트 승인 후 시작한다. 승인 상태는 .claude/_workspace/human-gates/tests.json에 해시·상태만 저장한다.
+
+- **정적 주입:** tests --check 통과 후 `node .claude/tools/inject-design.mjs`를 재실행하고 `--check`로 최신성을 확인한다. 주입기는 `{{GHERKIN_SCENARIO}}`에 승인된 scenario.feature, `{{TEST_CASES}}`에 확정 test-cases.md를 넣는다. --json의 humanGateInputs에서 지문을 확인한다. 개발자·DB 역할을 스폰할 때 현재 DESIGN_FINGERPRINT와 TEST_CASES_FINGERPRINT 값만 전달하고(명세 전문은 전달하지 않는다), 첫 코드 쓰기 전에 읽기 전용 --check --json 결과와 프롬프트의 설계·테스트 관리 블록 지문을 모두 대조하도록 한다. 최종 보고의 TEST_CASES_FINGERPRINT도 현재 주입 지문과 대조한다. 불일치/누락이면 새 컨텍스트 또는 새 세션에서 재개하며 명세 전문을 스폰 프롬프트로 중복 전달하지 않는다.
 
 ### Phase 3: 병렬 개발 트랙 (FE/BE/QA/Infra)
 - **착수 조건:** Gate 2 대상 라우트는 tests --check 통과가 필수다. QA의 테스트 작성과 구현 역할 호출에 앞서 검사하고 승인된 test-cases.md를 명시적으로 인계한다.
