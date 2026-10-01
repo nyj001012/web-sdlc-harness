@@ -217,6 +217,7 @@ allowed-tools:
 - 완료 후 `git commit -m "chore(issue): 티켓 생성 및 인터페이스 계약 완료"` 실행. 커밋 직전에 `handoff/phase-2.md`를 기록한다 (Rule 6). `artifacts`에 이슈 번호·브랜치명·계약 파일 경로를 남긴다.
 
 ### Gate 2 — Phase 2~3: QA 테스트 케이스 사용자 협업 검증
+- **독립 QA 세션 입력 준비:** CASE_REVIEW 세션을 안내하기 전에 `node .claude/tools/inject-design.mjs`와 `--check --json`을 실행해 설계·시나리오 관리 블록을 갱신한다. `claude --agent backend-qa`(또는 `frontend-qa`)는 세션 시작 시점의 에이전트 정의를 읽으므로 안내 전에 갱신해 두어야 하며, 사용자에게는 실행 명령만 안내한다. 이 세션에서 스킬로 직접 실행하는 대안은 QA 정의를 자동 주입받지 않으므로, 스킬의 입력 로딩 절차에 따라 해당 정의 파일의 관리 블록을 한 번 읽고 지문을 대조한다. 설계·시나리오 전문이나 QA 대화를 오케스트레이터의 안내에 복사하지 않는다. Gate 1 생략 경로라면 그 근거를 인계 파일에 기록한다.
 - **진입:** 계약 확정 직후, 테스트 코드·애플리케이션·스키마 구현 이전에 수행한다. Phase 2를 생략하는 FE/BE Heavy 라우트도 Phase 3 첫 단계에서 수행한다. Fast는 QA와 함께 생략하고 Heavy 승격 시 수행한다. TDD QA가 없는 인프라 단독·문서 단독·하네스 메타는 생략 사유를 기록한다.
 - **QA 독립 세션 (P2P 문답):** 오케스트레이터는 QA 문답에 관여하지 않는다. 질문 중계·재스폰을 하지 않고 CASE_REVIEW용 QA를 서브 에이전트로 스폰하지도 않는다(서브 에이전트는 사용자와 직접 문답할 수 없다). Gate 2가 필요하면 파이프라인을 **[WAITING_USER]로 멈추고** 사용자에게 안내한다: 별도 터미널에서 `claude --agent backend-qa`(또는 `frontend-qa`)를 실행해 QA와 직접 문답하고, QA가 test-cases.md를 작성해 사용자의 승인을 받은 뒤 세션이 종료되면, 이 세션으로 돌아와 "QA 완료"라고 알린다. 하나의 QA 세션이 FE/BE 레인 전체를 맡으며 이 시점에는 테스트/개발/DB 구현 역할을 시작하지 않는다.
 - 대안: 사용자가 원하면 이 세션에서 `design_backend_tdd_cases`/`design_frontend_tdd_cases`를 CASE_REVIEW로 직접 실행할 수 있다. 다만 문답이 이 세션 컨텍스트에 남으므로 Gate 2 통과 뒤 `/clear`(또는 새 세션)로 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다.
