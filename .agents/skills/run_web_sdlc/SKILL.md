@@ -207,6 +207,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 - 완료 후 `git commit -m "chore(issue): 티켓 생성 및 인터페이스 계약 완료"` 실행. 커밋 직전에 `handoff/phase-2.md`를 기록한다 (Rule 6). `artifacts`에 이슈 번호·브랜치명·계약 파일 경로를 남긴다.
 
 ### Gate 2 — Phase 2~3: QA 테스트 케이스 사용자 협업 검증
+- **독립 QA 세션 입력 준비:** CASE_REVIEW 세션을 안내하기 전에 `node .codex/tools/inject-design.mjs`와 `--check --json`을 실행해 설계·시나리오 관리 블록을 갱신한다. 사용자에게는 스킬과 해당 QA 정의 파일 경로만 안내한다. 스킬 직접 실행은 QA 정의를 자동 주입받지 않으므로, 독립 QA 세션은 스킬의 입력 로딩 절차에 따라 해당 정의 파일의 관리 블록을 한 번 읽고 지문을 대조한다. 설계·시나리오 전문이나 QA 대화를 오케스트레이터의 안내에 복사하지 않는다. Gate 1 생략 경로라면 그 근거를 인계 파일에 기록한다.
 - **진입:** 계약 확정 직후, 테스트 코드·애플리케이션·스키마 구현 이전에 수행한다. Phase 2를 생략하는 FE/BE Heavy 라우트도 Phase 3 첫 단계에서 수행한다. Fast는 QA와 함께 생략하고 Heavy 승격 시 수행한다. TDD QA가 없는 인프라 단독·문서 단독·하네스 메타는 생략 사유를 기록한다.
 - **QA 독립 세션 (P2P 문답):** 오케스트레이터는 QA 문답에 관여하지 않는다. 질문 중계·재스폰을 하지 않고 CASE_REVIEW용 QA를 서브 에이전트로 스폰하지도 않는다(서브 에이전트는 사용자와 직접 문답할 수 없다). Gate 2가 필요하면 파이프라인을 **[WAITING_USER]로 멈추고** 사용자에게 안내한다: 별도의 새 Codex 세션에서 `design_backend_tdd_cases` 또는 `design_frontend_tdd_cases` 스킬을 CASE_REVIEW 모드로 직접 실행해 QA와 문답하고, QA가 test-cases.md를 작성해 사용자의 승인을 받은 뒤 세션이 종료되면, 이 세션으로 돌아와 "QA 완료"라고 알린다. 하나의 QA 세션이 FE/BE 레인 전체를 맡으며 이 시점에는 테스트/개발/DB 구현 역할을 시작하지 않는다.
 - 대안: 사용자가 원하면 이 세션에서 `design_backend_tdd_cases`/`design_frontend_tdd_cases`를 CASE_REVIEW로 직접 실행할 수 있다. 다만 문답이 이 세션 컨텍스트에 남으므로 Gate 2 통과 뒤 새 Codex 세션에서 시작하고 `handoff/` 파일과 확정 파일만으로 재개한다.
@@ -219,6 +220,7 @@ description: 소프트웨어 개발 파이프라인(SDLC)을 지휘합니다. �
 - **정적 주입:** tests --check 통과 후 `node .codex/tools/inject-design.mjs`를 재실행하고 `--check`로 최신성을 확인한다. 주입기는 `{{GHERKIN_SCENARIO}}`에 승인된 scenario.feature, `{{TEST_CASES}}`에 확정 test-cases.md를 넣는다. --json의 humanGateInputs에서 지문을 확인한다. 개발자·DB 역할을 스폰할 때 현재 DESIGN_FINGERPRINT와 TEST_CASES_FINGERPRINT 값만 전달하고(명세 전문은 전달하지 않는다), 첫 코드 쓰기 전에 읽기 전용 --check --json 결과와 프롬프트의 설계·테스트 관리 블록 지문을 모두 대조하도록 한다. 최종 보고의 TEST_CASES_FINGERPRINT도 현재 주입 지문과 대조한다. 불일치/누락이면 새 컨텍스트 또는 새 세션에서 재개하며 명세 전문을 스폰 프롬프트로 중복 전달하지 않는다.
 
 ### Phase 3: 순차 위임 개발 (FE/BE/QA/Infra)
+- **WRITE_TESTS 지문 인계:** `backend-qa`·`frontend-qa`를 WRITE_TESTS로 스폰할 때도 현재 `DESIGN_FINGERPRINT`와 주입기 기준 `TEST_CASES_FINGERPRINT`를 전달한다. 첫 테스트 파일 쓰기 전에 QA가 승인 검사와 읽기 전용 주입 검사 결과를 현재 프롬프트의 두 지문과 대조하도록 한다. QA의 최종 보고 지문도 현재 주입 지문과 대조한다. 누락·불일치면 후속 개발자 호출을 중단하며, 디스크의 QA 정의를 다시 읽어 현재 프롬프트를 대체하는 방식으로 우회하지 않는다.
 - **착수 조건:** Gate 2 대상 라우트는 tests --check 통과가 필수다. QA의 테스트 작성과 구현 역할 호출에 앞서 검사하고 승인된 test-cases.md를 명시적으로 인계한다.
 - Codex에는 P2P 팀 모드가 없으므로(Rule 1), Track A(앱 구현)도 Track B(인프라)와 마찬가지로 **서브 에이전트를 한 번에 하나씩 위임하고, 각각의 최종 보고를 오케스트레이터가 읽어 다음 역할을 위임**하는 방식으로만 진행한다. `backend-qa`, `backend-developer`, `db-engineer`, `frontend-qa`, `frontend-developer`, `code-reviewer` 중 라우트에 필요한 역할만 명시해 이 순서로 위임한다.
 - ⭐️ **레인은 소유 경로 기준일 뿐 동시 실행을 뜻하지 않는다.** FE 레인·BE 레인·데이터 레인은 서로 다른 파일 트리를 갖는다는 의미이며, Claude Code 팀 모드처럼 세 레인을 동시에 띄워 두고 핑퐁시키는 병렬 실행은 Codex에서 성립하지 않는다. 레인 내부 순서는 **QA(실패하는 테스트 작성) → Developer(구현) → code-reviewer(검수)** 이고, 반려 시 Developer를 재스폰한다.
